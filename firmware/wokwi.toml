@@ -1,0 +1,31 @@
+# ============================================================================
+#  wokwi.toml — configuração da extensão "Wokwi for VS Code"
+# ============================================================================
+#  Esta extensão NÃO compila o firmware: ela apenas carrega no simulador um
+#  binário já compilado. Por isso os caminhos abaixo apontam para a saída do
+#  arduino-cli.
+#
+#  Como gerar o binário (execute dentro da pasta firmware/):
+#
+#    arduino-cli core install esp32:esp32
+#    arduino-cli lib install "DHT sensor library" "Adafruit Unified Sensor" \
+#                            "PubSubClient" "ArduinoJson"
+#    arduino-cli compile --fqbn esp32:esp32:esp32doit-devkit-v1 \
+#                        --output-dir build .
+#
+#  O arduino-cli nomeia os arquivos com o nome do sketch, então o comando
+#  acima produz build/sketch.ino.bin e build/sketch.ino.elf.
+#
+#  Depois: abra a pasta firmware/ no VS Code e rode o comando
+#  "Wokwi: Start Simulator" (F1). A extensão lê este arquivo + diagram.json.
+# ============================================================================
+
+[wokwi]
+version = 1
+
+# Imagem do firmware carregada na flash do ESP32 simulado.
+firmware = "build/sketch.ino.bin"
+
+# ELF com símbolos de depuração — usado para stack traces legíveis e
+# para breakpoints/GDB dentro do simulador.
+elf = "build/sketch.ino.elf"

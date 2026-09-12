@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "author": "eyeWatcher",
+  "editor": "wokwi",
+  "serialMonitor": {
+    "display": "always"
+  },
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht1",
+      "top": -160,
+      "left": 320,
+      "attrs": { "temperature": "28", "humidity": "50" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "rGreen",
+      "top": 30,
+      "left": 310,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledGreen",
+      "top": 10,
+      "left": 440,
+      "attrs": { "color": "green", "label": "OK" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "rYellow",
+      "top": 130,
+      "left": 310,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledYellow",
+      "top": 110,
+      "left": 440,
+      "attrs": { "color": "yellow", "label": "WARN" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "rRed",
+      "top": 230,
+      "left": 310,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledRed",
+      "top": 210,
+      "left": 440,
+      "attrs": { "color": "red", "label": "CRIT" }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz1",
+      "top": 310,
+      "left": 400,
+      "attrs": { "volume": "0.1" }
+    },
+    {
+      "type": "wokwi-gnd",
+      "id": "gnd1",
+      "top": 400,
+      "left": 160,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    ["esp:3V3", "dht1:VCC", "red", ["v-30", "h180"]],
+    ["esp:GND.1", "dht1:GND", "black", ["v-50", "h200"]],
+    ["esp:D15", "dht1:SDA", "green", ["v-20", "h160"]],
+
+    ["esp:D25", "rGreen:1", "green", ["h30", "v-10"]],
+    ["rGreen:2", "ledGreen:A", "green", ["h30"]],
+    ["ledGreen:C", "gnd1:GND", "black", ["v70", "h-300"]],
+
+    ["esp:D26", "rYellow:1", "gold", ["h40", "v40"]],
+    ["rYellow:2", "ledYellow:A", "gold", ["h30"]],
+    ["ledYellow:C", "gnd1:GND", "black", ["v70", "h-300"]],
+
+    ["esp:D27", "rRed:1", "red", ["h50", "v90"]],
+    ["rRed:2", "ledRed:A", "red", ["h30"]],
+    ["ledRed:C", "gnd1:GND", "black", ["v70", "h-300"]],
+
+    ["esp:D4", "bz1:2", "purple", ["h60", "v300"]],
+    ["bz1:1", "gnd1:GND", "black", ["v30", "h-260"]],
+
+    ["esp:GND.2", "gnd1:GND", "black", ["v80", "h40"]]
+  ],
+  "dependencies": {}
+}

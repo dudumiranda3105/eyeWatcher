@@ -21,10 +21,20 @@ Broker: Mosquitto. Host/porta configuráveis por env.
 ### Tópicos
 | Tópico | Quem publica | QoS | Retain |
 |---|---|---|---|
-| `eyewatcher/<rack_id>/telemetry` | ESP32 | 1 | false |
+| `eyewatcher/<rack_id>/telemetry` | ESP32 | 0 | false |
 | `eyewatcher/<rack_id>/status`    | ESP32 (LWT + online) | 1 | **true** |
 | `eyewatcher/+/telemetry`         | backend assina | 1 | - |
 | `eyewatcher/+/status`            | backend assina | 1 | - |
+
+> **Nota sobre o QoS da telemetria.** A biblioteca `PubSubClient` do ESP32
+> implementa QoS 1 apenas em *subscribe* e no LWT; o `publish()` dela é sempre
+> QoS 0. Isso é adequado para este caso e foi mantido de propósito: a telemetria
+> é periódica a cada 5 s, então uma leitura perdida é substituída pela seguinte
+> em segundos e não altera a análise da série. O campo `seq` torna qualquer
+> perda detectável. Onde a entrega garantida realmente importa — o **LWT**, que
+> sinaliza a queda do dispositivo, e as **assinaturas do backend** — usa-se
+> QoS 1. Trocar de biblioteca só para elevar o QoS da telemetria adicionaria
+> risco sem benefício prático.
 
 `<rack_id>` do projeto base: `rack01`.
 
