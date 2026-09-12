@@ -1,0 +1,110 @@
+# ============================================================================
+# eyeWatcher — stack de infraestrutura (Mosquitto + InfluxDB 2.x)
+# ----------------------------------------------------------------------------
+# ATENÇÃO: este arquivo é o CAMINHO ALTERNATIVO.
+#
+# A máquina de desenvolvimento do projeto NÃO tem Docker instalado. O caminho
+# oficial/testado é a instalação nativa no Windows, feita pelos scripts em
+# `scripts/` (veja scripts/README.md). Use este docker-compose apenas se você
+# conseguir instalar o Docker Desktop depois — ele reproduz exatamente as
+# mesmas portas, org, bucket e retenção definidas em docs/CONTRACT.md.
+#
+# Como usar:
+#   1) copie infra/.env.example para infra/.env e ajuste o token
+#   2) cd infra
+#   3) docker compose up -d
+#   4) docker compose ps        (confira os healthchecks como "healthy")
+#
+# Depois de subir, o backend deve usar no seu .env:
+#   INFLUX_URL=http://localhost:8086
+#   INFLUX_ORG=eyewatcher
+#   INFLUX_BUCKET=rack_metrics
+#   INFLUX_TOKEN=<o mesmo DOCKER_INFLUXDB_INIT_ADMIN_TOKEN do infra/.env>
+#   MQTT_HOST=localhost
+#   MQTT_PORT=1883
+# ============================================================================
+
+services:
+
+  # --------------------------------------------------------------------------
+  # Broker MQTT — recebe a telemetria publicada pelo ESP32 (Wokwi)
+  # Porta 1883 = MQTT sobre TCP (firmware e backend)
+  # Porta 9001 = MQTT sobre WebSocket (contrato: navegador/depuração)
+  # --------------------------------------------------------------------------
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: eyewatcher-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"   # MQTT TCP  — docs/CONTRACT.md seção 7
+      - "9001:9001"   # MQTT WebSocket — docs/CONTRACT.md seção 7
+    volumes:
+      # A configuração vem do repositório (somente leitura dentro do container).
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      # Persistência da fila/sessões e dos logs em volumes nomeados.
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    healthcheck:
+      # Assina um tópico do broker ($SYS) e sai no 1º pacote recebido.
+      # O "$$" é a forma de escapar "$" dentro do docker-compose.
+      test: ["CMD-SHELL", "mosquitto_sub -h 127.0.0.1 -p 1883 -t '$$SYS/broker/uptime' -C 1 -W 3 -i healthcheck || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - eyewatcher
+
+  # --------------------------------------------------------------------------
+  # Banco de séries temporais — guarda o histórico das leituras do rack
+  # O setup inicial (org, bucket, retenção, usuário e token) é automático
+  # através das variáveis DOCKER_INFLUXDB_INIT_*: na PRIMEIRA subida o
+  # container já sai pronto, sem precisar abrir a UI.
+  # --------------------------------------------------------------------------
+  influxdb:
+    image: influxdb:2.7
+    container_name: eyewatcher-influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"   # API HTTP + UI — docs/CONTRACT.md seção 7
+    environment:
+      # "setup" = provisiona tudo no primeiro boot (volume vazio).
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USERNAME:-eyewatcher}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD:?defina INFLUXDB_PASSWORD no infra/.env}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-eyewatcher}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-rack_metrics}
+      # Retenção de 30 dias, conforme docs/CONTRACT.md seção 4.
+      DOCKER_INFLUXDB_INIT_RETENTION: ${INFLUXDB_RETENTION:-30d}
+      # Token admin FIXO: é o valor que vai para INFLUX_TOKEN no backend/.env.
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:?defina INFLUXDB_ADMIN_TOKEN no infra/.env}
+    volumes:
+      - influxdb_data:/var/lib/influxdb2     # séries temporais (TSM)
+      - influxdb_config:/etc/influxdb2       # configuração/credenciais internas
+    healthcheck:
+      test: ["CMD-SHELL", "influx ping --host http://127.0.0.1:8086 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - eyewatcher
+
+# ----------------------------------------------------------------------------
+# Volumes nomeados: os dados sobrevivem a `docker compose down`.
+# Para zerar tudo (inclusive o setup do InfluxDB): docker compose down -v
+# ----------------------------------------------------------------------------
+volumes:
+  mosquitto_data:
+    name: eyewatcher_mosquitto_data
+  mosquitto_log:
+    name: eyewatcher_mosquitto_log
+  influxdb_data:
+    name: eyewatcher_influxdb_data
+  influxdb_config:
+    name: eyewatcher_influxdb_config
+
+networks:
+  eyewatcher:
+    name: eyewatcher_net
+    driver: bridge

@@ -1,0 +1,12 @@
+# Contém senha do InfluxDB e o token admin — nunca versionar.
+.env
+
+# Arquivo de senhas do Mosquitto, se você endurecer o broker
+# (veja mosquitto/config/README.md).
+mosquitto/config/passwd
+mosquitto/config/acl
+
+# Dados locais, caso alguém rode o broker/banco fora dos volumes nomeados.
+mosquitto/data/
+mosquitto/log/
+influxdb/data/
