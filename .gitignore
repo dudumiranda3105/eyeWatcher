@@ -1,0 +1,44 @@
+# --- Python / backend ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# --- Node / frontend ---
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# --- Segredos e ambiente ---
+.env
+.env.*
+!.env.example
+*.token
+
+# --- Dados persistidos localmente ---
+infra/mosquitto/data/
+infra/mosquitto/log/
+infra/influxdb/data/
+*.db
+
+# --- Build de firmware ---
+firmware/build/
+firmware/.pio/
+*.elf
+*.bin
+
+# --- Editores / SO ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# --- Logs ---
+*.log
+npm-debug.log*
