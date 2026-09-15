@@ -267,6 +267,59 @@ function Install-ConfiguracaoMosquitto {
     return $true
 }
 
+
+# ---------------------------------------------------------------------------
+# PATH do usuário
+# ---------------------------------------------------------------------------
+
+function Add-DiretorioAoPath {
+    <#
+    .SYNOPSIS
+        Acrescenta um diretório ao PATH do usuário, se ainda não estiver lá.
+    .DESCRIPTION
+        O instalador do Mosquitto no Windows NÃO adiciona a própria pasta ao
+        PATH, então comandos como "mosquitto", "mosquitto_pub" e
+        "mosquitto_sub" não funcionam no terminal depois de instalar.
+        Esta função resolve isso. É idempotente: rodar de novo não duplica.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Diretorio
+    )
+
+    if (-not (Test-Path $Diretorio)) {
+        Write-Aviso "Diretorio nao encontrado, nada a fazer no PATH: $Diretorio"
+        return $false
+    }
+
+    $atual = [System.Environment]::GetEnvironmentVariable('Path', 'User')
+    if ($null -eq $atual) { $atual = '' }
+
+    $jaTem = $false
+    foreach ($parte in $atual.Split(';')) {
+        if ($parte.Trim().TrimEnd('') -ieq $Diretorio.TrimEnd('')) { $jaTem = $true }
+    }
+
+    if ($jaTem) {
+        Write-Ok "Ja esta no PATH do usuario: $Diretorio"
+        return $true
+    }
+
+    $novo = $atual
+    if ($novo -ne '' -and -not $novo.EndsWith(';')) { $novo = $novo + ';' }
+    $novo = $novo + $Diretorio
+
+    try {
+        [System.Environment]::SetEnvironmentVariable('Path', $novo, 'User')
+        # Reflete tambem na sessao atual, para nao precisar reabrir o terminal.
+        $env:Path = $env:Path + ';' + $Diretorio
+        Write-Ok "Adicionado ao PATH do usuario: $Diretorio"
+        return $true
+    } catch {
+        Write-Aviso "Nao consegui alterar o PATH: $($_.Exception.Message)"
+        return $false
+    }
+}
+
 # ===========================================================================
 # EXECUÇÃO
 # ===========================================================================
@@ -376,6 +429,14 @@ if ($SkipConfig) {
     Install-ConfiguracaoMosquitto -ConfOrigem $confRepo `
                                   -DiretorioMosquitto $dirMosquitto `
                                   -Sobrescrever:$Force | Out-Null
+}
+
+# --- PATH -------------------------------------------------------------------
+Write-Titulo 'Ajustando o PATH'
+if ($dirMosquitto) {
+    Add-DiretorioAoPath -Diretorio $dirMosquitto | Out-Null
+} else {
+    Write-Aviso 'Mosquitto nao localizado: PATH nao foi alterado.'
 }
 
 # ---------------------------------------------------------------------------

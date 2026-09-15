@@ -210,7 +210,7 @@ usar o **seu** Mosquitto.
 
 4. Rode a simulação no wokwi.com.
 
-> ⚠️ Enquanto o túnel estiver aberto, **qualquer pessoa com a URL** consegue
+> Enquanto o túnel estiver aberto, **qualquer pessoa com a URL** consegue
 > publicar no seu broker. Feche o ngrok (`Ctrl+C`) ao terminar a demonstração.
 > O backend continua apontando para `localhost:1883` — o túnel só serve para o
 > ESP32 entrar.
@@ -224,7 +224,7 @@ Só para provar que o firmware funciona quando nada mais estiver disponível.
 #define MQTT_PORT     1883
 ```
 
-> 🚨 **Atenção — isto NÃO pontua "Mosquitto próprio".** O requisito do projeto é
+> **Atenção — isto NÃO pontua "Mosquitto próprio".** O requisito do projeto é
 > um broker Mosquitto que **você** sobe (ver `infra/`); usar o broker público
 > substitui essa peça da arquitetura e o backend deixaria de consumir do seu
 > broker. Além disso, o `test.mosquitto.org` é **totalmente aberto**: qualquer
