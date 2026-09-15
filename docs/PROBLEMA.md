@@ -1,141 +1,142 @@
-# Definição do Problema e Proposta de Solução IoT
+# O problema e a solução proposta
 
-> Critério de avaliação: **1,0 ponto** — *Definição do problema e proposta da solução IoT*
+## Onde está o problema
 
----
+Servidor de laboratório, de empresa pequena ou o servidor caseiro de quem mexe
+com isso por hobby raramente fica numa sala preparada. Na prática ele acaba num
+almoxarifado adaptado, numa sala de apoio ou até dentro de um armário. São
+lugares onde a temperatura varia bastante ao longo do dia e onde o ar-condicionado
+costuma ser desligado fora do horário comercial.
 
-## 1. O problema real
+A falha que acontece nesses casos segue quase sempre o mesmo roteiro. A
+temperatura dentro do rack sobe devagar, ao longo de horas. O processador começa
+a reduzir a frequência para se proteger e o desempenho cai, sem que ninguém
+perceba. Depois algum componente, geralmente a fonte ou um disco, atinge a
+temperatura de desligamento automático. Aí o serviço cai, e só nesse momento
+alguém vai descobrir que existia um problema térmico.
 
-Servidores caseiros (*homelabs*), racks de pequenas empresas e laboratórios de
-instituições de ensino quase nunca possuem a infraestrutura de climatização
-monitorada que existe em um *data center* profissional. Na prática, esses
-equipamentos ficam em salas de apoio, almoxarifados adaptados ou até em
-armários — ambientes em que a temperatura oscila muito ao longo do dia e o
-ar-condicionado frequentemente é desligado fora do horário comercial.
+Dois detalhes tornam isso pior do que parece.
 
-O resultado é um padrão de falha conhecido e recorrente:
+O primeiro é que o problema é percebido pelo sintoma e não pela causa. Quando
+alguém nota, o estrago já aconteceu. E mesmo quando não chega a cair, o calor
+acima da faixa recomendada vai reduzindo a vida útil dos componentes de forma
+silenciosa e acumulada.
 
-1. A temperatura interna do rack sobe lentamente ao longo de horas.
-2. Os processadores entram em *thermal throttling* e o desempenho cai — sem
-   nenhum aviso visível ao usuário.
-3. A fonte ou o disco atinge a temperatura de desligamento por proteção.
-4. **O serviço cai.** Só então alguém descobre que havia um problema térmico.
+O segundo é que não sobra histórico nenhum. Sem uma série de medições ao longo do
+tempo não dá para responder perguntas básicas depois do problema: a temperatura
+já estava subindo antes da queda de ontem? O pico acontece sempre no mesmo
+horário, por causa do sol da tarde naquela parede? O ar-condicionado realmente
+ficou ligado no fim de semana? A troca do ventilador melhorou alguma coisa ou foi
+impressão?
 
-### Por que isso é grave
+Vale mencionar a umidade também, porque quase ninguém mede. Umidade muito baixa
+favorece descarga eletrostática e umidade muito alta favorece corrosão e
+condensação.
 
-- **Detecção tardia.** O problema é percebido pelo *sintoma* (serviço fora do ar),
-  não pela *causa* (temperatura). Quando o alerta chega, o dano já ocorreu.
-- **Redução da vida útil do hardware.** Segundo a regra prática de Arrhenius
-  aplicada à eletrônica, cada 10 °C acima da faixa recomendada tende a reduzir
-  pela metade a vida útil de componentes eletrônicos. O desgaste é silencioso e
-  cumulativo.
-- **Umidade também importa.** Umidade relativa muito baixa favorece descargas
-  eletrostáticas; muito alta favorece corrosão e condensação. Praticamente
-  ninguém mede isso em ambientes pequenos.
-- **Ausência total de histórico.** Sem série temporal, é impossível responder a
-  perguntas básicas de diagnóstico:
-  - *A temperatura já estava subindo antes da queda de ontem?*
-  - *O pico acontece sempre no mesmo horário?* (ex.: sol da tarde na parede)
-  - *O ar-condicionado realmente ficou ligado no fim de semana?*
-  - *A troca do ventilador melhorou alguma coisa, ou foi impressão?*
+## Por que as opções atuais não resolvem
 
-### Por que as alternativas existentes não resolvem
+Termômetro de parede mostra o valor naquele instante e só. Não registra nada e
+depende de alguém olhando na hora certa.
 
-| Alternativa | Limitação |
-|---|---|
-| Termômetro de parede | Não registra histórico e exige alguém olhando |
-| Sensores da BIOS / IPMI | Medem o chip, não o **ambiente do rack**; não cobrem umidade; indisponíveis quando o servidor cai |
-| Solução comercial de DCIM | Custo e complexidade incompatíveis com o porte desses ambientes |
-| Planilha preenchida manualmente | Baixa frequência de amostragem e sujeita a esquecimento |
+Os sensores da própria placa, acessíveis pela BIOS ou por IPMI, medem a
+temperatura do chip e não a do ar dentro do rack. Além disso não cobrem umidade
+e ficam indisponíveis exatamente quando o servidor cai, que é quando a informação
+seria mais útil.
 
-O problema é, portanto, de **instrumentação contínua e independente do
-servidor monitorado** — exatamente o tipo de lacuna que a Internet das Coisas
-preenche bem.
+Sistemas comerciais de monitoramento de datacenter resolvem o problema, mas têm
+custo e complexidade que não fazem sentido nesse porte.
 
----
+Planilha preenchida à mão funciona no papel, mas a frequência de medição fica
+baixa demais e as pessoas esquecem.
 
-## 2. A solução proposta: eyeWatcher
+Sobra uma lacuna: falta uma medição contínua, feita por um equipamento que não
+seja o próprio servidor monitorado. É esse tipo de coisa que a Internet das
+Coisas resolve bem.
 
-O **eyeWatcher** é um sistema IoT de monitoramento ambiental de racks que mede
-temperatura e umidade de forma contínua, armazena a série histórica e apresenta
-tudo em um dashboard Web.
+## O que o eyeWatcher faz
 
-O ponto central do projeto é que o dispositivo de medição é **independente do
-servidor monitorado**: mesmo que o servidor esteja desligado, travado ou
-superaquecido, o ESP32 continua medindo e reportando — que é justamente o
-momento em que o dado tem mais valor.
+O eyeWatcher mede temperatura e umidade dentro do rack a cada 5 segundos, guarda
+tudo e mostra num dashboard web.
 
-### Arquitetura da solução
+O ponto central do projeto é o dispositivo de medição ser independente do servidor
+monitorado. Mesmo que o servidor esteja desligado, travado ou superaquecido, o
+ESP32 continua medindo e reportando normalmente. É justamente nesse momento que a
+informação vale mais.
+
+O caminho do dado é o seguinte:
 
 ```
-┌───────────────┐    MQTT     ┌────────────┐   MQTT    ┌──────────────┐
-│    ESP32      │  publish    │            │ subscribe │   Backend    │
-│   + DHT22     ├────────────►│ Mosquitto  ├──────────►│   Python     │
-│ (rack físico) │  QoS 1      │  (Broker)  │           │  (FastAPI)   │
-└───────────────┘             └────────────┘           └──────┬───────┘
-      mede a cada 5s                                          │ escreve
-                                                              ▼
-┌─────────────────┐        HTTP/WebSocket          ┌──────────────────┐
-│   Dashboard     │◄───────────────────────────────┤     InfluxDB     │
-│ Vue 3 + Chart.js│      consulta histórico        │ (séries temporais)│
-└─────────────────┘                                └──────────────────┘
+ESP32 + DHT22  --MQTT-->  Mosquitto  -->  Python  -->  InfluxDB  -->  Dashboard Vue
 ```
 
-### Como cada dor vira uma funcionalidade
+O ESP32 lê o sensor, classifica o estado e publica um JSON num tópico MQTT. O
+Mosquitto entrega para o backend em Python, que valida a mensagem, recalcula a
+classificação e grava no InfluxDB. O dashboard consulta esse histórico e também
+recebe as leituras novas em tempo real.
 
-| Dor identificada | Funcionalidade do eyeWatcher |
-|---|---|
-| Descoberta tardia do superaquecimento | Leitura a cada 5 s com classificação imediata em `ok` / `warning` / `critical`, sinalizada por LEDs no próprio rack e no banner do dashboard |
-| Falta de histórico para achar padrões | Todas as leituras persistidas no InfluxDB (retenção de 30 dias) e gráfico com janelas de 15 min a 7 dias |
-| Umidade ignorada | Medida pelo mesmo sensor DHT22, com faixa segura própria e limiares independentes |
-| "Foi impressão minha ou piorou?" | Painel de mín / máx / média por período, permitindo comparação objetiva antes e depois de uma intervenção |
-| Não saber se o sensor parou de reportar | *Last Will Testament* do MQTT marca o dispositivo como `offline` automaticamente se ele cair — ausência de dado também é informação |
+### Ligando as dores nas funcionalidades
 
-### Por que MQTT e não HTTP direto
+Para o problema de só descobrir tarde demais, o sistema lê a cada 5 segundos e
+classifica na hora em normal, alerta ou crítico. A sinalização aparece tanto nos
+LEDs do próprio rack quanto no topo do dashboard.
 
-MQTT foi escolhido por ser o protocolo padrão de IoT para este cenário:
-é leve (cabe com folga na memória do ESP32), usa uma conexão TCP persistente em
-vez de abrir uma requisição a cada leitura, oferece QoS 1 (garantia de entrega
-com retransmissão) e, principalmente, desacopla produtor e consumidor — o
-backend pode ser reiniciado sem que o ESP32 precise saber ou ser reconfigurado.
-O recurso de *Last Will Testament*, que detecta queda do dispositivo sem custo
-adicional, não tem equivalente direto em HTTP.
+Para a falta de histórico, todas as leituras ficam guardadas no InfluxDB por 30
+dias, e o gráfico permite olhar de 15 minutos até 7 dias atrás.
 
-### Por que um banco de séries temporais
+Para a umidade ignorada, o mesmo sensor DHT22 já mede, com faixa segura e limites
+próprios.
 
-As leituras são um fluxo append-only indexado por tempo, consultado quase sempre
-por intervalo e de forma agregada ("média por minuto nas últimas 6 horas").
-O InfluxDB é construído para esse padrão: compacta bem dados numéricos
-repetitivos, tem *downsampling* nativo (`aggregateWindow`) e aplica políticas de
-retenção automáticas — três coisas que exigiriam código manual em um banco
-relacional.
+Para a dúvida de "melhorou ou foi impressão", existe o painel com mínima, média e
+máxima do período, que permite comparar antes e depois de uma mudança com número
+em vez de achismo.
 
----
+E para o caso do sensor parar de reportar, o MQTT tem o recurso de Last Will: se
+o dispositivo cair, o próprio broker publica que ele está offline. Assim a falta
+de dado também vira um aviso, em vez de o dashboard ficar mostrando para sempre a
+última leitura boa.
 
-## 3. Escopo do 1º bimestre
+## Por que MQTT e não HTTP direto
 
-Entregue nesta etapa:
+MQTT é o protocolo mais usado em IoT e por bons motivos neste caso.
 
-- [x] 1 dispositivo (ESP32 simulado no Wokwi) com sensor DHT22
-- [x] Publicação MQTT com QoS 1 e LWT
-- [x] Broker Mosquitto com listeners TCP e WebSocket
-- [x] Backend Python que assina, valida e persiste as leituras
-- [x] Persistência no InfluxDB com tags e campos modelados
-- [x] API REST + WebSocket para consulta do histórico e tempo real
-- [x] Dashboard Vue 3 + TypeScript + Vite com gráfico Chart.js e indicadores
-- [x] Código versionado em Git
+Ele é leve, o que importa num microcontrolador. Usa uma conexão TCP que fica
+aberta, em vez de abrir uma requisição nova a cada leitura. Tem confirmação de
+entrega quando você precisa dela. E separa quem publica de quem consome, então dá
+para reiniciar o backend sem que o ESP32 precise saber ou ser reconfigurado.
 
-## 4. Continuidade prevista para o 2º bimestre
+O Last Will, que avisa da queda do dispositivo sem custo nenhum, não tem
+equivalente direto em HTTP.
 
-O projeto foi estruturado para crescer sem reescrita:
+## Por que um banco de séries temporais
 
-- **Múltiplos racks** — os tópicos já usam `eyewatcher/<rack_id>/...` e o backend
-  já assina com o coringa `+`, então adicionar um segundo dispositivo não exige
-  mudança de código.
-- **Notificações ativas** — e-mail/Telegram disparados quando o status entrar em
-  `critical` por N leituras consecutivas.
-- **Autenticação** — usuários e perfis no dashboard, e credenciais no Mosquitto.
-- **Novos sensores** — corrente elétrica (consumo do rack) e sensor de porta
-  aberta, reaproveitando o mesmo payload.
-- **Previsão** — regressão simples sobre a série do InfluxDB para estimar quando
-  a temperatura cruzará o limiar crítico e alertar *antes* do evento.
+As leituras formam um fluxo que só cresce, indexado por tempo, e que quase sempre
+é consultado por intervalo e de forma agregada. O tipo de pergunta é "média por
+minuto nas últimas 6 horas", não "traga a linha com esse id".
+
+O InfluxDB é feito para esse padrão. Ele comprime bem dado numérico repetitivo,
+já tem agregação por janela de tempo embutida e aplica política de retenção
+sozinho. As três coisas dariam trabalho manual num banco relacional.
+
+## O que entra neste bimestre
+
+- Um dispositivo ESP32 simulado no Wokwi com sensor DHT22
+- Publicação por MQTT, com Last Will configurado
+- Mosquitto como broker, com porta TCP e WebSocket
+- Backend em Python que recebe, valida e grava as leituras
+- Persistência no InfluxDB com tags e campos modelados
+- API REST e WebSocket para o histórico e o tempo real
+- Dashboard em Vue 3 com TypeScript, Vite e gráfico em Chart.js
+- Código versionado no Git
+
+## Para onde isso vai no próximo bimestre
+
+O projeto foi montado para crescer sem precisar reescrever.
+
+Os tópicos MQTT já usam o formato `eyewatcher/<rack>/...` e o backend já assina
+com curinga, então colocar um segundo rack não exige mudar código.
+
+Além disso a ideia é acrescentar notificação ativa por e-mail ou Telegram quando
+o estado ficar crítico por algumas leituras seguidas, login de usuário no
+dashboard com senha no Mosquitto, sensor de corrente e de porta aberta
+reaproveitando o mesmo formato de mensagem, e uma regressão simples sobre o
+histórico para estimar quando a temperatura vai cruzar o limite e avisar antes.

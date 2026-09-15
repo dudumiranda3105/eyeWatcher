@@ -1,161 +1,162 @@
-<h1 align="center">👁️ eyeWatcher</h1>
+# eyeWatcher
 
-<p align="center">
-  <strong>Monitoramento IoT de temperatura e umidade em racks de servidores</strong><br/>
-  <em>Porque quando o serviço cai por superaquecimento, já é tarde demais.</em>
-</p>
-
-<p align="center">
-  <img alt="ESP32" src="https://img.shields.io/badge/ESP32-Wokwi-blue"/>
-  <img alt="MQTT" src="https://img.shields.io/badge/MQTT-Mosquitto-660066"/>
-  <img alt="Python" src="https://img.shields.io/badge/Python-FastAPI-3776AB"/>
-  <img alt="InfluxDB" src="https://img.shields.io/badge/InfluxDB-2.x-22ADF6"/>
-  <img alt="Vue" src="https://img.shields.io/badge/Vue-3%20%2B%20TypeScript-42B883"/>
-</p>
-
----
+Monitoramento de temperatura e umidade em racks de servidores usando ESP32, MQTT e
+um dashboard web.
 
 ## O problema
 
-Servidores caseiros, de pequenas empresas e de laboratórios superaquecem **sem
-aviso**. A falha só é descoberta quando o serviço já caiu — e não existe
-histórico algum para descobrir se aquilo vinha acontecendo há semanas.
+Servidor caseiro, de laboratório ou de empresa pequena quase nunca fica numa sala
+com climatização monitorada. Normalmente fica num armário, numa sala de apoio ou
+em algum canto onde o ar-condicionado é desligado à noite. O resultado é sempre o
+mesmo: a temperatura sobe devagar, o processador começa a reduzir a frequência,
+e em algum momento alguma coisa desliga sozinha. Só aí alguém percebe que tinha
+um problema.
 
-Termômetro de parede não registra nada. Os sensores da BIOS medem o chip, não o
-ambiente do rack — e ficam indisponíveis justamente quando o servidor cai.
-Solução comercial de DCIM é cara demais para esse porte.
+O pior é que não sobra nenhum registro. Depois da queda não dá para saber se a
+temperatura já vinha subindo há dias, se o pico acontece sempre no mesmo horário,
+ou se aquele ventilador novo resolveu alguma coisa.
 
-## A solução
+Termômetro de parede não guarda histórico e depende de alguém olhando. Os sensores
+da própria placa medem o chip, não o ar do rack, e ficam indisponíveis justamente
+quando a máquina cai. Sistema comercial de monitoramento de datacenter é caro
+demais para esse tamanho de operação.
 
-O **eyeWatcher** mede o ambiente do rack continuamente com um dispositivo
-**independente do servidor monitorado**, guarda toda a série histórica e mostra
-tudo em um dashboard web em tempo real.
+## A ideia
 
-> Leitura completa: [`docs/PROBLEMA.md`](docs/PROBLEMA.md)
+O eyeWatcher mede o ambiente do rack de 5 em 5 segundos com um dispositivo que
+não depende do servidor monitorado. Essa é a parte que importa: se o servidor
+travar ou desligar, o sensor continua medindo e avisando — que é exatamente
+quando o dado tem valor.
 
-## Arquitetura
+As leituras vão para um banco de séries temporais e aparecem num dashboard web,
+com gráfico do histórico, indicadores do estado atual e uma lista dos alertas
+recentes.
+
+Tem mais detalhe em [docs/PROBLEMA.md](docs/PROBLEMA.md).
+
+## Como funciona
 
 ```
-ESP32 + DHT22  ──MQTT──►  Mosquitto  ──►  Python (FastAPI)  ──►  InfluxDB
-   (Wokwi)                                      │                    │
-                                                └──REST/WebSocket────┴──►  Vue 3 + Chart.js
+ESP32 + DHT22  --MQTT-->  Mosquitto  -->  Python (FastAPI)  -->  InfluxDB
+   (Wokwi)                                     |                     |
+                                               +--REST/WebSocket-----+--> Vue 3 + Chart.js
 ```
 
-> Diagramas detalhados: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md)
+O ESP32 lê o sensor e publica um JSON num tópico MQTT. O Mosquitto entrega essa
+mensagem para o backend em Python, que valida, classifica o estado (normal, alerta
+ou crítico) e grava no InfluxDB. O dashboard consulta o backend por HTTP para
+montar o gráfico e recebe as leituras novas por WebSocket.
 
-## Funcionalidades
+Os diagramas estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
-- 📡 Leitura de temperatura, umidade e sensação térmica a cada 5 segundos
-- 🚦 Classificação automática em `ok` / `warning` / `critical`, com LEDs e buzzer no próprio rack
-- 📈 Histórico persistido em banco de séries temporais, com janelas de 15 min a 7 dias
-- ⚡ Dashboard atualizado em tempo real via WebSocket, com fallback automático para polling
-- 🔌 Detecção de queda do dispositivo via *Last Will Testament* do MQTT — **ausência de dado também é alerta**
-- 📊 Mín / máx / média por período e tabela de alertas recentes
-- 🧪 Simulador em Python que replica o ESP32, para desenvolvimento e como plano B na apresentação
+## O que já funciona
 
-## Stack
+- Leitura de temperatura, umidade e sensação térmica a cada 5 segundos
+- LED verde, amarelo ou vermelho no próprio rack, mais buzzer quando fica crítico
+- Histórico guardado no InfluxDB, com janelas de 15 minutos até 7 dias
+- Dashboard atualizando ao vivo por WebSocket, com volta automática para
+  consulta periódica se a conexão cair
+- Detecção de queda do dispositivo pelo Last Will do MQTT, então ficar sem dado
+  também vira aviso
+- Mínima, média e máxima do período e tabela dos alertas
+- Um simulador em Python que publica igual ao ESP32, útil para desenvolver sem
+  a placa e como reserva na hora de apresentar
 
-| Camada | Tecnologia |
+## Tecnologias
+
+| Camada | O que usamos |
 |---|---|
-| Dispositivo | ESP32 + DHT22 (simulado no Wokwi) |
-| Protocolo | MQTT (QoS 1 + LWT) |
+| Dispositivo | ESP32 com DHT22, simulado no Wokwi |
+| Comunicação | MQTT |
 | Broker | Eclipse Mosquitto |
-| Backend | Python · FastAPI · paho-mqtt |
+| Backend | Python com FastAPI e paho-mqtt |
 | Banco | InfluxDB 2.x |
-| Frontend | Vue 3 · TypeScript · Vite |
+| Frontend | Vue 3, TypeScript e Vite |
 | Gráficos | Chart.js |
 
-## Estrutura do repositório
+## Organização das pastas
 
 ```
 eyeWatcher/
-├── firmware/      # Sketch do ESP32 + diagrama do Wokwi
-├── backend/       # FastAPI, cliente MQTT, escrita no InfluxDB, simulador
-├── frontend/      # Dashboard Vue 3 + TypeScript + Vite
-├── infra/         # mosquitto.conf e docker-compose
-├── scripts/       # Scripts de instalação e inicialização (Windows)
-└── docs/          # Problema, arquitetura, contrato e roteiro de apresentação
+├── firmware/   sketch do ESP32 e o diagrama do Wokwi
+├── backend/    API em Python, cliente MQTT e o simulador
+├── frontend/   dashboard em Vue
+├── infra/      configuração do Mosquitto e docker-compose
+├── scripts/    scripts de instalação e inicialização no Windows
+└── docs/       documentação do projeto
 ```
 
-## Como executar
+## Rodando o projeto
 
-### Pré-requisitos
+Precisa de Python 3.11 ou mais novo, Node 18 ou mais novo, Mosquitto e InfluxDB 2.x.
 
-- Python 3.11+ · Node.js 18+ · Mosquitto · InfluxDB 2.x
-
-No Windows, os dois últimos podem ser instalados com:
+No Windows dá para instalar o Mosquitto e o InfluxDB com:
 
 ```powershell
 .\scripts\install-windows.ps1
 ```
 
-### Subir tudo de uma vez
+Depois, para subir tudo de uma vez:
 
 ```powershell
 .\scripts\start-all.ps1
 ```
 
-### Ou passo a passo
+Se preferir na mão:
 
 ```bash
-# 1. Broker MQTT
+# broker
 mosquitto -c infra/mosquitto/config/mosquitto.conf -v
 
-# 2. InfluxDB (e configuração inicial da org/bucket/token)
+# banco
 influxd
-# depois:  .\scripts\setup-influx.ps1
+# e na primeira vez: .\scripts\setup-influx.ps1
 
-# 3. Backend
+# backend
 cd backend
 python -m venv .venv && source .venv/Scripts/activate
 pip install -r requirements.txt
-cp .env.example .env          # preencha o INFLUX_TOKEN
+cp .env.example .env        # preencher o INFLUX_TOKEN
 python -m app.main
 
-# 4. Frontend
+# dashboard
 cd frontend
 npm install
 npm run dev
-
-# 5. Wokwi — ver instruções em firmware/README.md
 ```
 
-Acesse o dashboard em **http://localhost:5173**
+O dashboard fica em http://localhost:5173 e a documentação da API em
+http://localhost:8000/docs.
 
-### Sem hardware? Use o simulador
+Para o ESP32, as instruções estão em [firmware/README.md](firmware/README.md).
+
+## Sem a placa
+
+O simulador publica exatamente o mesmo JSON nos mesmos tópicos:
 
 ```bash
-python backend/simulator.py --backfill 24   # popula 24h de histórico
-python backend/simulator.py                 # publica em tempo real
+python backend/simulator.py --backfill 12   # preenche 12h de histórico
+python backend/simulator.py                 # publica ao vivo
 python backend/simulator.py --stress        # força um pico crítico
 ```
 
 ## Portas
 
-| Serviço | Porta |
-|---|---|
-| Mosquitto (TCP / WebSocket) | 1883 / 9001 |
-| InfluxDB | 8086 |
-| Backend (API + Swagger em `/docs`) | 8000 |
-| Frontend | 5173 |
+- 1883 e 9001: Mosquitto (TCP e WebSocket)
+- 8086: InfluxDB
+- 8000: backend
+- 5173: dashboard
 
 ## Documentação
 
-| Documento | Conteúdo |
-|---|---|
-| [`docs/PROBLEMA.md`](docs/PROBLEMA.md) | Definição do problema e proposta da solução |
-| [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) | Diagramas, modelo de dados e decisões de projeto |
-| [`docs/CONTRATO.md`](docs/CONTRACT.md) | Contrato técnico entre as camadas (tópicos, payloads, rotas) |
-| [`docs/APRESENTACAO.md`](docs/APRESENTACAO.md) | Roteiro de demonstração e checklist da avaliação |
+- [docs/PROBLEMA.md](docs/PROBLEMA.md) — o problema e a proposta
+- [docs/ARQUITETURA.md](docs/ARQUITETURA.md) — diagramas e decisões técnicas
+- [docs/CONTRACT.md](docs/CONTRACT.md) — tópicos, formato das mensagens e rotas
+- [docs/APRESENTACAO.md](docs/APRESENTACAO.md) — roteiro da apresentação
 
-## Roadmap — 2º bimestre
+## Próximo bimestre
 
-- [ ] Múltiplos racks simultâneos (a arquitetura de tópicos já suporta)
-- [ ] Notificações ativas por e-mail e Telegram
-- [ ] Autenticação de usuários e credenciais no Mosquitto
-- [ ] Novos sensores: corrente elétrica e sensor de porta do rack
-- [ ] Previsão de cruzamento de limiar a partir da série histórica
-
----
-
-<p align="center"><sub>Projeto acadêmico — Aplicações Web integradas com IoT · 1º bimestre</sub></p>
+A ideia é continuar daqui: vários racks ao mesmo tempo (os tópicos já estão
+preparados para isso), notificação por e-mail ou Telegram, login no dashboard,
+sensor de corrente e de porta aberta, e uma previsão simples de quando a
+temperatura vai cruzar o limite.

@@ -1,81 +1,84 @@
-# Arquitetura do eyeWatcher
+# Arquitetura
 
-## 1. Visão geral do fluxo
+## Visão geral
 
 ```mermaid
 flowchart LR
-    subgraph campo["Campo — rack monitorado"]
-        DHT["Sensor DHT22<br/>temperatura + umidade"]
+    subgraph campo["No rack"]
+        DHT["Sensor DHT22"]
         ESP["ESP32<br/>(Wokwi)"]
-        LED["LEDs + buzzer<br/>alerta local"]
-        DHT -->|1-Wire<br/>GPIO 15| ESP
+        LED["LEDs e buzzer"]
+        DHT -->|GPIO 15| ESP
         ESP --> LED
     end
 
-    subgraph infra["Infraestrutura"]
-        MOSQ["Mosquitto<br/>broker MQTT<br/>:1883 / :9001"]
-        PY["Backend Python<br/>FastAPI + paho-mqtt<br/>:8000"]
-        DB[("InfluxDB 2.x<br/>bucket rack_metrics<br/>:8086")]
+    subgraph infra["Servidor"]
+        MOSQ["Mosquitto<br/>1883 / 9001"]
+        PY["Backend Python<br/>FastAPI<br/>8000"]
+        DB[("InfluxDB<br/>8086")]
     end
 
-    subgraph web["Aplicação Web"]
-        VUE["Vue 3 + TypeScript<br/>Vite + Chart.js<br/>:5173"]
+    subgraph web["Navegador"]
+        VUE["Vue 3 + Chart.js<br/>5173"]
     end
 
-    ESP -->|"publish QoS 1<br/>eyewatcher/rack01/telemetry"| MOSQ
-    MOSQ -->|"subscribe<br/>eyewatcher/+/telemetry"| PY
-    PY -->|"write<br/>measurement: ambiente"| DB
-    DB -->|"query Flux"| PY
-    PY -->|"REST /api/*"| VUE
-    PY -.->|"WebSocket /ws/live<br/>tempo real"| VUE
+    ESP -->|"eyewatcher/rack01/telemetry"| MOSQ
+    MOSQ -->|"eyewatcher/+/telemetry"| PY
+    PY -->|"grava"| DB
+    DB -->|"consulta"| PY
+    PY -->|"/api/..."| VUE
+    PY -.->|"/ws/live"| VUE
 ```
 
-## 2. Por que cada tecnologia está aqui
+## O papel de cada tecnologia
 
-| Camada | Tecnologia | Papel concreto no projeto |
-|---|---|---|
-| Sensor | DHT22 | Mede temperatura (−40 a 80 °C, ±0,5 °C) e umidade (0–100 %, ±2 %) |
-| Dispositivo | ESP32 (Wokwi) | Lê o sensor, classifica o status, aciona LEDs e publica via MQTT |
-| Transporte | MQTT | Protocolo pub/sub leve, com QoS 1 e *Last Will Testament* |
-| Broker | Mosquitto | Intermedia as mensagens e desacopla dispositivo de backend |
-| Processamento | Python (FastAPI) | Valida o payload, recalcula o status, persiste e expõe a API |
-| Persistência | InfluxDB | Série temporal com agregação e retenção nativas |
-| Interface | Vue 3 + TS + Vite | Dashboard reativo e tipado |
-| Visualização | Chart.js | Gráfico de linha do histórico com linhas de limiar |
-| Versionamento | Git + GitHub | Histórico do código |
+O DHT22 mede temperatura de -40 a 80 °C com precisão de mais ou menos 0,5 °C, e
+umidade de 0 a 100% com precisão de 2%. É barato e suficiente para o que
+queremos.
 
-## 3. Ciclo de vida de uma leitura
+O ESP32 lê o sensor, calcula a sensação térmica, decide se o estado é normal,
+alerta ou crítico, acende o LED correspondente e publica a leitura.
+
+O MQTT transporta essas mensagens. O Mosquitto é o broker, ou seja, quem recebe
+de quem publica e entrega para quem assina.
+
+O backend em Python recebe as mensagens, valida o conteúdo, recalcula a
+classificação e grava. Também é ele que expõe a API que o dashboard consome.
+
+O InfluxDB guarda a série temporal. O Vue 3 com TypeScript monta a interface e o
+Chart.js desenha o gráfico.
+
+## O caminho de uma leitura
 
 ```mermaid
 sequenceDiagram
     participant D as DHT22
     participant E as ESP32
     participant M as Mosquitto
-    participant B as Backend Python
+    participant B as Backend
     participant I as InfluxDB
-    participant W as Dashboard Vue
+    participant W as Dashboard
 
     Note over E: a cada 5 segundos
-    E->>D: solicita leitura
-    D-->>E: temperatura, umidade
-    E->>E: calcula heat_index<br/>e classifica status
-    E->>E: acende LED correspondente
-    E->>M: PUBLISH eyewatcher/rack01/telemetry (QoS 1)
-    M-->>E: PUBACK
+    E->>D: pede a leitura
+    D-->>E: temperatura e umidade
+    E->>E: calcula a sensação térmica<br/>e classifica o estado
+    E->>E: acende o LED
+    E->>M: publica em eyewatcher/rack01/telemetry
     M->>B: entrega a mensagem
-    B->>B: valida schema (pydantic)
-    B->>B: recalcula status pelos limiares do servidor
-    B->>I: escreve ponto no measurement "ambiente"
-    B-->>W: push via WebSocket (tempo real)
+    B->>B: valida o formato
+    B->>B: recalcula o estado pelos limites do servidor
+    B->>I: grava o ponto
+    B-->>W: envia pelo WebSocket
     Note over W: usuário troca o período para 24h
-    W->>B: GET /api/readings/history?range=24h&window=1m
-    B->>I: query Flux com aggregateWindow
-    I-->>B: série agregada
-    B-->>W: JSON de pontos
-    W->>W: renderiza o gráfico Chart.js
+    W->>B: GET /api/readings/history?range=24h
+    B->>I: consulta agregada por janela
+    I-->>B: série pronta
+    B-->>W: JSON com os pontos
+    W->>W: redesenha o gráfico
 ```
 
-## 4. Detecção de queda do dispositivo (LWT)
+## Detectando que o dispositivo caiu
 
 ```mermaid
 sequenceDiagram
@@ -83,58 +86,67 @@ sequenceDiagram
     participant M as Mosquitto
     participant B as Backend
 
-    E->>M: CONNECT (will: "offline" em eyewatcher/rack01/status, retain)
-    E->>M: PUBLISH "online" (retain) em eyewatcher/rack01/status
-    M->>B: status = online
-    Note over E: queda de energia / WiFi / travamento
-    E--xM: conexão perdida (sem DISCONNECT)
-    Note over M: keepalive expira
-    M->>B: publica automaticamente "offline"
+    E->>M: conecta, avisando o "testamento":<br/>publicar "offline" se eu sumir
+    E->>M: publica "online"
+    M->>B: dispositivo online
+    Note over E: falta de energia, queda de WiFi<br/>ou travamento
+    E--xM: conexão perdida sem aviso
+    Note over M: o keepalive expira
+    M->>B: publica "offline" automaticamente
     B->>B: marca o rack como offline
-    Note over B: o dashboard mostra "dispositivo offline"
 ```
 
-Isso resolve um ponto sutil: **a ausência de dados também é um alerta**. Sem o
-LWT, um sensor que parasse de reportar deixaria o dashboard exibindo para sempre
-a última leitura boa, dando a falsa impressão de que está tudo bem.
+Esse recurso do MQTT se chama Last Will and Testament. Quando o cliente conecta,
+ele já entrega ao broker uma mensagem que deve ser publicada caso a conexão caia
+de forma anormal.
 
-## 5. Modelo de dados no InfluxDB
+Isso resolve um detalhe que passa despercebido: sem esse mecanismo, um sensor que
+parasse de responder deixaria o dashboard mostrando para sempre a última leitura
+boa, passando a impressão de que está tudo bem. Com ele, a ausência de dado vira
+um aviso explícito.
 
-Measurement `ambiente`:
+## Como os dados ficam no banco
 
-| Elemento | Nome | Tipo | Observação |
-|---|---|---|---|
-| tag | `device_id` | string | `esp32-rack01` |
-| tag | `rack_id` | string | `rack01` |
-| tag | `location` | string | `Sala de Servidores A` |
-| tag | `status` | string | `ok` / `warning` / `critical` |
-| field | `temperature` | float | °C |
-| field | `humidity` | float | % RH |
-| field | `heat_index` | float | °C (sensação térmica) |
-| field | `seq` | int | contador, detecta perda de mensagens |
-| time | — | ns | carimbado na chegada ao backend |
+Os pontos vão para a medição `ambiente`, com esta estrutura:
 
-**Tag ou field?** Tags são indexadas e servem para filtrar/agrupar; fields
-guardam os valores medidos. Por isso `status` é tag (queremos filtrar alertas
-por ele rapidamente) e as medições são fields. Manter `location` como tag
-permite agrupar racks por sala no 2º bimestre sem alterar o schema.
+| Tipo | Nome | Observação |
+|---|---|---|
+| tag | `device_id` | esp32-rack01 |
+| tag | `rack_id` | rack01 |
+| tag | `location` | Sala de Servidores A |
+| tag | `status` | normal, alerta ou crítico |
+| campo | `temperature` | em °C |
+| campo | `humidity` | em % |
+| campo | `heat_index` | sensação térmica, em °C |
+| campo | `seq` | contador de mensagens |
 
-## 6. Decisões de projeto relevantes
+A diferença entre tag e campo importa. Tags são indexadas e servem para filtrar e
+agrupar, campos guardam os valores medidos. Por isso o `status` é tag, já que
+queremos filtrar rapidamente só os alertas, e as medições são campos. Deixar a
+`location` como tag permite agrupar racks por sala mais tarde sem mudar nada.
 
-**Timestamp gerado pelo backend, não pelo ESP32.** O ESP32 simulado não tem RTC
-com bateria; após um reset ele voltaria a 1970. Como a latência da rede local é
-de milissegundos e o intervalo de amostragem é de 5 s, carimbar a hora na
-chegada é mais confiável e não distorce a série. O campo `seq` permite detectar
-mensagens perdidas mesmo sem timestamp de origem.
+## Algumas decisões e o motivo delas
 
-**Status calculado duas vezes.** O ESP32 calcula para acender o LED
-imediatamente (não depende da rede). O backend recalcula antes de gravar, porque
-os limiares podem ser ajustados no servidor sem exigir reflash do firmware —
-e porque não se deve confiar cegamente no dado que chega do dispositivo.
+**Quem marca a hora é o backend, não o ESP32.** O ESP32 simulado não tem relógio
+com bateria, então depois de um reset ele voltaria para 1970. Como a rede local
+responde em milissegundos e a leitura é a cada 5 segundos, marcar a hora na
+chegada é mais confiável e não distorce nada. O campo `seq` serve para perceber
+se alguma mensagem se perdeu no caminho.
 
-**Escrita em lote no InfluxDB.** Uma requisição HTTP por leitura desperdiçaria
-conexões; o cliente usa *batching*, agrupando pontos antes de enviar.
+**O estado é calculado duas vezes.** O ESP32 calcula para acender o LED na hora,
+sem depender da rede. O backend recalcula antes de gravar, porque assim dá para
+ajustar os limites no servidor sem regravar o firmware, e porque não é boa ideia
+confiar cegamente no que chega do dispositivo.
 
-**WebSocket com fallback para polling.** Se o WebSocket cair (proxy, rede
-instável na apresentação), o dashboard volta sozinho a consultar a API a cada
-10 s. A tela nunca congela.
+**A gravação no InfluxDB é em lote.** Abrir uma requisição HTTP por leitura
+desperdiçaria conexão à toa, então o cliente junta alguns pontos antes de enviar.
+
+**O WebSocket tem plano B.** Se a conexão cair, por proxy ou rede instável, o
+dashboard volta sozinho a consultar a API a cada 10 segundos. A tela não trava.
+
+**A telemetria usa QoS 0 e o Last Will usa QoS 1.** A biblioteca PubSubClient do
+ESP32 só implementa QoS 1 na assinatura e no Last Will, e isso funciona bem aqui.
+Como a leitura é a cada 5 segundos, uma mensagem perdida é substituída pela
+seguinte em poucos segundos e não muda a análise, e o campo `seq` deixa a perda
+visível. Já onde a entrega garantida importa de verdade, que é o aviso de queda
+do dispositivo, o QoS 1 está em uso.
