@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="6" fill="#0f212a"/>
+  <!-- a faixa de limiares: ok / alerta / crítico -->
+  <rect x="5" y="7" width="12" height="4" rx="1" fill="#2ed0ba"/>
+  <rect x="17" y="7" width="5" height="4" rx="1" fill="#f6b53f"/>
+  <rect x="22" y="7" width="5" height="4" rx="1" fill="#ff6a56"/>
+  <!-- marcador na faixa -->
+  <rect x="18.6" y="5.4" width="2" height="7.2" rx="1" fill="#e6f0f3"/>
+  <!-- traço da leitura -->
+  <path d="M5 24 L10 21 L14 22.5 L19 17.5 L23 19 L27 15"
+        fill="none" stroke="#ff7d45" stroke-width="2.4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

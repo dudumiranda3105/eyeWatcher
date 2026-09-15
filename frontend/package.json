@@ -1,0 +1,30 @@
+{
+  "name": "eyewatcher-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Painel web de monitoramento térmico de racks de servidores (eyeWatcher).",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "axios": "^1.20.0",
+    "chart.js": "^4.5.1",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "date-fns": "^4.4.0",
+    "pinia": "^4.0.3",
+    "vue": "^3.5.42",
+    "vue-chartjs": "^5.3.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "@vue/tsconfig": "^0.9.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0",
+    "vue-tsc": "^3.3.11"
+  }
+}

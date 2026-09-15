@@ -1,0 +1,176 @@
+/* ============================================================
+   eyeWatcher — painel de instrumentos de sala de servidores
+   Claro = aço pintado (padrão; projetor não lava o fundo)
+   Escuro = petróleo profundo, quando o sistema pede
+   ============================================================ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Superfícies */
+  --bg: #e5ebee;
+  --bg-grid: rgba(16, 33, 42, 0.05);
+  --panel: #ffffff;
+  --panel-sunk: #f1f5f7;
+  --line: #ccd8dd;
+  --line-strong: #a3b6be;
+
+  /* Tinta */
+  --ink: #0f212a;
+  --ink-muted: #4c6672;
+  --ink-faint: #74909c;
+
+  /* Status (contrato: ok / warning / critical) */
+  --ok: #0c8c7d;
+  --ok-wash: #d3ece8;
+  --warn: #b9720a;
+  --warn-wash: #f8e6c8;
+  --crit: #c3341f;
+  --crit-wash: #f8dcd6;
+  --on-status: #ffffff;
+
+  /* Séries */
+  --temp: #dd5620;
+  --umid: #2a74bd;
+  --temp-fill: rgba(221, 86, 32, 0.12);
+  --umid-fill: rgba(42, 116, 189, 0.1);
+
+  /* Tipografia */
+  --font-display: 'Archivo', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Public Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Martian Mono', 'Cascadia Mono', ui-monospace, 'Courier New', monospace;
+
+  /* Ritmo */
+  --radius: 4px;
+  --radius-lg: 8px;
+  --gap: 16px;
+  --shadow: 0 1px 2px rgba(15, 33, 42, 0.06), 0 8px 24px -18px rgba(15, 33, 42, 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b161b;
+    --bg-grid: rgba(160, 210, 224, 0.045);
+    --panel: #13232b;
+    --panel-sunk: #0f1d24;
+    --line: #223b46;
+    --line-strong: #365764;
+
+    --ink: #e6f0f3;
+    --ink-muted: #97aeb9;
+    --ink-faint: #6d8794;
+
+    --ok: #2ed0ba;
+    --ok-wash: rgba(46, 208, 186, 0.14);
+    --warn: #f6b53f;
+    --warn-wash: rgba(246, 181, 63, 0.14);
+    --crit: #ff6a56;
+    --crit-wash: rgba(255, 106, 86, 0.16);
+    --on-status: #08151a;
+
+    --temp: #ff7d45;
+    --umid: #63b2ec;
+    --temp-fill: rgba(255, 125, 69, 0.14);
+    --umid-fill: rgba(99, 178, 236, 0.16);
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -20px rgba(0, 0, 0, 0.8);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  /* Trama fina de painel perfurado: estrutura, não decoração. */
+  background-image: radial-gradient(var(--bg-grid) 1px, transparent 1px);
+  background-size: 22px 22px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Etiqueta de painel: pequena, monoespaçada, muito espaçada. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pintura por status — usada em cards, banner, badges e réguas. */
+[data-status='ok'] {
+  --status: var(--ok);
+  --status-wash: var(--ok-wash);
+}
+
+[data-status='warning'] {
+  --status: var(--warn);
+  --status-wash: var(--warn-wash);
+}
+
+[data-status='critical'] {
+  --status: var(--crit);
+  --status-wash: var(--crit-wash);
+}
+
+[data-status='offline'] {
+  --status: var(--ink-faint);
+  --status-wash: var(--panel-sunk);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
