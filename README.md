@@ -160,3 +160,12 @@ A ideia é continuar daqui: vários racks ao mesmo tempo (os tópicos já estão
 preparados para isso), notificação por e-mail ou Telegram, login no dashboard,
 sensor de corrente e de porta aberta, e uma previsão simples de quando a
 temperatura vai cruzar o limite.
+
+## Autores
+
+| Nome | GitHub |
+|---|---|
+| Eduardo Miranda | [@dudumiranda3105](https://github.com/dudumiranda3105) |
+| Eduarda Roberta Borges da Silva | [@Eduarda-Borges-Silva](https://github.com/Eduarda-Borges-Silva) |
+| Rebeca Souza Lúcio Chagas | [@RebecaSLChagas](https://github.com/RebecaSLChagas) |
+| Edson Gabriel Klippel Pereira | - |
