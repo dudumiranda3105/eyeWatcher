@@ -1,10 +1,19 @@
-# eyeWatcher — backend
-# Versoes fixadas e validadas com wheels para CPython 3.13 / 3.14 (Windows x64).
-fastapi==0.141.1
-uvicorn[standard]==0.52.4
-paho-mqtt==2.1.0
+# eyeWatcher — dependencias de todos os servicos Python.
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+websockets==17.4
+pydantic==2.14.3
+pydantic-settings==2.16.2
+httpx==0.28.1
+PyJWT==2.15.1
+bcrypt==5.0.0
+asyncpg==0.32.0
 influxdb-client==1.50.0
-pydantic==2.13.5
-pydantic-settings==2.15.0
-python-dotenv==1.2.3
-websockets==17.1
+aio-pika==10.2.2
+aiomqtt==2.5.1
+paho-mqtt==2.2.0
+numpy==2.5.4
+pandas==3.1.1
+pyarrow==26.0.1
+scikit-learn==1.9.1
+joblib==1.6.0
