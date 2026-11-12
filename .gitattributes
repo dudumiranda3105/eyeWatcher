@@ -1,0 +1,4 @@
+# Scripts e configs rodam em Linux dentro dos containers: nunca com CRLF.
+* text=auto eol=lf
+*.png binary
+*.jpg binary

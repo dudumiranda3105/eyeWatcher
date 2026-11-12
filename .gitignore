@@ -42,3 +42,11 @@ desktop.ini
 # --- Logs ---
 *.log
 npm-debug.log*
+
+# --- Segredos gerados pelo bootstrap (infra/bootstrap/gen_secrets.py) ---
+secrets/
+
+# --- Dados e modelos gerados em tempo de execucao ---
+backend/data/
+*.parquet
+*.joblib

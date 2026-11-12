@@ -1,0 +1,17 @@
+# O simulador publica telemetria e o proprio status, e so le comandos e config.
+user simulator
+topic write eyewatcher/+/+/+/telemetry
+topic write eyewatcher/sim/status
+topic read eyewatcher/+/+/+/cmd
+topic read eyewatcher/sim/config
+
+# O gateway faz o caminho inverso.
+user gateway
+topic read eyewatcher/+/+/+/telemetry
+topic read eyewatcher/sim/status
+topic write eyewatcher/+/+/+/cmd
+topic write eyewatcher/sim/config
+
+# So para o healthcheck do Compose.
+user healthcheck
+topic read $SYS/broker/uptime

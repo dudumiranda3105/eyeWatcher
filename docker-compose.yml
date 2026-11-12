@@ -1,0 +1,282 @@
+# eyeWatcher — a solucao inteira sobe com:  docker compose up
+#
+# Sem nenhum preparo: o servico `bootstrap` gera os segredos em ./secrets/ (fora
+# do Git) antes de qualquer outro subir. A aplicacao fica em http://localhost:8080
+# e e a unica porta publicada para ela; as interfaces de estudo (RabbitMQ,
+# InfluxDB e Adminer) ficam so em 127.0.0.1.
+
+name: eyewatcher
+
+x-python-service: &python-service
+  build: ./backend
+  image: eyewatcher/backend:2
+  restart: unless-stopped
+  networks: [eyewatcher]
+  healthcheck:
+    test: ["CMD", "python", "-m", "eyewatcher.healthcheck"]
+    interval: 15s
+    timeout: 5s
+    retries: 5
+    start_period: 30s
+
+x-needs-rabbit: &needs-rabbit
+  bootstrap:
+    condition: service_completed_successfully
+  rabbitmq:
+    condition: service_healthy
+
+services:
+  bootstrap:
+    image: python:3.13-slim
+    command: ["python", "/bootstrap/gen_secrets.py", "/secrets"]
+    volumes:
+      - ./infra/bootstrap:/bootstrap:ro
+      - ./secrets:/secrets
+    restart: "no"
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0.22
+    entrypoint: ["sh", "/mosquitto/config/entrypoint.sh"]
+    restart: unless-stopped
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    volumes:
+      - ./infra/mosquitto:/mosquitto/config:ro
+      - ./secrets/mosquitto:/run/eyewatcher:ro
+      - mosquitto_data:/mosquitto/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mosquitto_sub -h 127.0.0.1 -u healthcheck -P "$$(cat /run/eyewatcher/healthcheck)" -t '$$SYS/broker/uptime' -C 1 -W 3
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks: [eyewatcher]
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    hostname: eyewatcher-rabbit
+    restart: unless-stopped
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/conf.d/20-eyewatcher.conf:ro
+      - ./secrets/rabbitmq:/etc/rabbitmq/eyewatcher:ro
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    networks: [eyewatcher]
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_USER: eyewatcher
+      POSTGRES_DB: eyewatcher
+      POSTGRES_PASSWORD_FILE: /run/eyewatcher/password
+    volumes:
+      - ./secrets/postgres:/run/eyewatcher:ro
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eyewatcher -d eyewatcher"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks: [eyewatcher]
+
+  influxdb:
+    image: influxdb:2.7-alpine
+    restart: unless-stopped
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: eyewatcher
+      DOCKER_INFLUXDB_INIT_PASSWORD_FILE: /run/eyewatcher/password
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN_FILE: /run/eyewatcher/token
+      DOCKER_INFLUXDB_INIT_ORG: eyewatcher
+      DOCKER_INFLUXDB_INIT_BUCKET: telemetry
+      DOCKER_INFLUXDB_INIT_RETENTION: 30d
+    volumes:
+      - ./secrets/influxdb:/run/eyewatcher:ro
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    healthcheck:
+      test: ["CMD-SHELL", "influx ping --host http://127.0.0.1:8086"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks: [eyewatcher]
+
+  ollama:
+    image: ollama/ollama:0.13.5
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: "-1"
+      OLLAMA_NUM_PARALLEL: "1"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    networks: [eyewatcher]
+
+  # Baixa o modelo uma vez; nas proximas subidas ele ja esta no volume.
+  ollama-pull:
+    image: ollama/ollama:0.13.5
+    entrypoint: ["ollama", "pull", "llama3.2:3b"]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+    networks: [eyewatcher]
+
+  simulator:
+    <<: *python-service
+    command: ["python", "-m", "eyewatcher.services.simulator"]
+    environment:
+      SERVICE_NAME: simulator
+    volumes:
+      - ./secrets/simulator:/run/eyewatcher:ro
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+
+  gateway:
+    <<: *python-service
+    command: ["python", "-m", "eyewatcher.services.gateway"]
+    environment:
+      SERVICE_NAME: gateway
+    volumes:
+      - ./secrets/gateway:/run/eyewatcher:ro
+    depends_on:
+      <<: *needs-rabbit
+      mosquitto:
+        condition: service_healthy
+
+  recorder:
+    <<: *python-service
+    command: ["python", "-m", "eyewatcher.services.recorder"]
+    environment:
+      SERVICE_NAME: recorder
+    volumes:
+      - ./secrets/recorder:/run/eyewatcher:ro
+    depends_on:
+      <<: *needs-rabbit
+      influxdb:
+        condition: service_healthy
+
+  inference:
+    <<: *python-service
+    command: ["python", "-m", "eyewatcher.services.inference"]
+    environment:
+      SERVICE_NAME: inference
+    volumes:
+      - ./secrets/inference:/run/eyewatcher:ro
+      - models:/data/models:ro
+    depends_on: *needs-rabbit
+
+  lab:
+    <<: *python-service
+    command: ["python", "-m", "eyewatcher.services.lab"]
+    environment:
+      SERVICE_NAME: lab
+    volumes:
+      - ./secrets/lab:/run/eyewatcher:ro
+      - datasets:/data/datasets
+    depends_on:
+      <<: *needs-rabbit
+      influxdb:
+        condition: service_healthy
+
+  trainer:
+    <<: *python-service
+    command: ["python", "-m", "eyewatcher.services.trainer"]
+    environment:
+      SERVICE_NAME: trainer
+    volumes:
+      - ./secrets/trainer:/run/eyewatcher:ro
+      - datasets:/data/datasets:ro
+      - models:/data/models
+    depends_on: *needs-rabbit
+
+  api:
+    <<: *python-service
+    command: ["python", "-m", "eyewatcher.api"]
+    environment:
+      SERVICE_NAME: api
+    volumes:
+      - ./secrets/api:/run/eyewatcher:ro
+      - datasets:/data/datasets:ro
+    depends_on:
+      <<: *needs-rabbit
+      postgres:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    image: eyewatcher/frontend:2
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks: [eyewatcher]
+
+  adminer:
+    image: adminer:5
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [eyewatcher]
+
+volumes:
+  mosquitto_data:
+  rabbitmq_data:
+  postgres_data:
+  influxdb_data:
+  influxdb_config:
+  ollama_data:
+  datasets:
+  models:
+
+networks:
+  eyewatcher:
