@@ -117,26 +117,20 @@ O InfluxDB é feito para esse padrão. Ele comprime bem dado numérico repetitiv
 já tem agregação por janela de tempo embutida e aplica política de retenção
 sozinho. As três coisas dariam trabalho manual num banco relacional.
 
-## O que entra neste bimestre
+## O que entrou no 2º bimestre
 
-- Um dispositivo ESP32 simulado no Wokwi com sensor DHT22
-- Publicação por MQTT, com Last Will configurado
-- Mosquitto como broker, com porta TCP e WebSocket
-- Backend em Python que recebe, valida e grava as leituras
-- Persistência no InfluxDB com tags e campos modelados
-- API REST e WebSocket para o histórico e o tempo real
-- Dashboard em Vue 3 com TypeScript, Vite e gráfico em Chart.js
-- Código versionado no Git
+O problema continua o mesmo: a sala esquenta e ninguém percebe a tempo. O que mudou
+é o momento em que o sistema avisa.
 
-## Para onde isso vai no próximo bimestre
+No 1º bimestre ele avisava quando a temperatura já tinha subido. Só que a temperatura
+sobe por causa de alguma coisa, e na maior parte das vezes essa coisa é o
+ar-condicionado perdendo capacidade aos poucos. Rolamento gasto, filtro entupido e
+desbalanceamento aparecem na vibração, na corrente e na rotação dias antes de a sala
+esquentar.
 
-O projeto foi montado para crescer sem precisar reescrever.
+Por isso os dois CRACs da sala viraram equipamentos monitorados, e a IA prevê a saúde
+e a vida útil restante de cada um. O aviso passa a vir antes do problema térmico, a
+tempo de programar a manutenção.
 
-Os tópicos MQTT já usam o formato `eyewatcher/<rack>/...` e o backend já assina
-com curinga, então colocar um segundo rack não exige mudar código.
-
-Além disso a ideia é acrescentar notificação ativa por e-mail ou Telegram quando
-o estado ficar crítico por algumas leituras seguidas, login de usuário no
-dashboard com senha no Mosquitto, sensor de corrente e de porta aberta
-reaproveitando o mesmo formato de mensagem, e uma regressão simples sobre o
-histórico para estimar quando a temperatura vai cruzar o limite e avisar antes.
+O ESP32 deu lugar a um dispositivo simulado em software, que publica pelo mesmo MQTT.
+O sketch do 1º bimestre continua em `firmware/`, como histórico.

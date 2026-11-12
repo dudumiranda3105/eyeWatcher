@@ -1,165 +1,184 @@
 # eyeWatcher
 
-Monitoramento de temperatura e umidade em racks de servidores usando ESP32, MQTT e
-um dashboard web.
+Monitoramento AIoT de salas de servidores: sensores, atuadores, gêmeo digital 3D,
+manutenção preditiva e um assistente com LLM local, tudo subindo com um comando.
 
 ## O problema
 
 Servidor caseiro, de laboratório ou de empresa pequena quase nunca fica numa sala
-com climatização monitorada. Normalmente fica num armário, numa sala de apoio ou
-em algum canto onde o ar-condicionado é desligado à noite. O resultado é sempre o
-mesmo: a temperatura sobe devagar, o processador começa a reduzir a frequência,
-e em algum momento alguma coisa desliga sozinha. Só aí alguém percebe que tinha
-um problema.
+com climatização monitorada. O resultado é sempre o mesmo: a temperatura sobe
+devagar, o processador reduz a frequência e em algum momento alguma coisa desliga
+sozinha. Só aí alguém percebe que tinha um problema, e não sobra nenhum registro.
 
-O pior é que não sobra nenhum registro. Depois da queda não dá para saber se a
-temperatura já vinha subindo há dias, se o pico acontece sempre no mesmo horário,
-ou se aquele ventilador novo resolveu alguma coisa.
-
-Termômetro de parede não guarda histórico e depende de alguém olhando. Os sensores
-da própria placa medem o chip, não o ar do rack, e ficam indisponíveis justamente
-quando a máquina cai. Sistema comercial de monitoramento de datacenter é caro
-demais para esse tamanho de operação.
-
-## A ideia
-
-O eyeWatcher mede o ambiente do rack de 5 em 5 segundos com um dispositivo que
-não depende do servidor monitorado. Essa é a parte que importa: se o servidor
-travar ou desligar, o sensor continua medindo e avisando — que é exatamente
-quando o dado tem valor.
-
-As leituras vão para um banco de séries temporais e aparecem num dashboard web,
-com gráfico do histórico, indicadores do estado atual e uma lista dos alertas
-recentes.
+No 1º bimestre o eyeWatcher resolveu a parte de medir e guardar o histórico. Agora
+ele também olha para quem causa o problema: os **ar-condicionados de precisão
+(CRACs)** da sala. Eles se desgastam aos poucos, e a IA percebe isso pela vibração,
+pela corrente, pela temperatura e pela rotação antes de a máquina parar e a sala
+esquentar.
 
 Tem mais detalhe em [docs/PROBLEMA.md](docs/PROBLEMA.md).
 
-## Como funciona
+## Arquitetura
 
+```mermaid
+flowchart TB
+    SIM["Simulador<br/>sensores e atuadores"] <-->|MQTT| MOS["Mosquitto<br/>broker MQTT"]
+    MOS <-->|MQTT| GW["Gateway<br/>MQTT para RabbitMQ"]
+    GW <--> RMQ["RabbitMQ (AMQP)<br/>exchange topic, filas de telemetria,<br/>eventos, comandos e jobs"]
+
+    RMQ --> REC["Gravador"]
+    REC --> INF[("InfluxDB<br/>séries temporais")]
+    RMQ <--> IA["Inferência IA<br/>regressão ao vivo"]
+    RMQ <--> LAB["Lab e treino<br/>dados e modelos"]
+    LAB --> MOD[("Modelos<br/>volume compartilhado")]
+    MOD --> IA
+    RMQ <--> API["API FastAPI<br/>REST, WebSocket e regras"]
+    API <--> PG[("PostgreSQL<br/>cadastros e regras")]
+    API <--> LLM["LLM local<br/>Ollama, em CPU"]
+    API <--> WEB["Frontend Web<br/>dashboard, 3D, insights e assistente"]
 ```
-ESP32 + DHT22  --MQTT-->  Mosquitto  -->  Python (FastAPI)  -->  InfluxDB
-   (Wokwi)                                     |                     |
-                                               +--REST/WebSocket-----+--> Vue 3 + Chart.js
+
+Todo dado passa pelo RabbitMQ. O detalhe de cada fluxo está em
+[docs/ARQUITETURA.md](docs/ARQUITETURA.md).
+
+## Rodando
+
+Precisa só do Docker com Compose. No Windows, a virtualização precisa estar ligada
+na BIOS e o WSL2 com pelo menos 8 GB de memória.
+
+```bash
+docker compose up
 ```
 
-O ESP32 lê o sensor e publica um JSON num tópico MQTT. O Mosquitto entrega essa
-mensagem para o backend em Python, que valida, classifica o estado (normal, alerta
-ou crítico) e grava no InfluxDB. O dashboard consulta o backend por HTTP para
-montar o gráfico e recebe as leituras novas por WebSocket.
+Não tem nenhum passo antes disso. O serviço `bootstrap` gera todas as senhas em
+`secrets/`, que fica fora do Git. A primeira subida demora mais, porque compila as
+imagens e baixa o modelo do Ollama (cerca de 2 GB).
 
-Os diagramas estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
+A aplicação fica em **http://localhost:8080**.
 
-## O que já funciona
+### Usuários de demonstração
 
-- Leitura de temperatura, umidade e sensação térmica a cada 5 segundos
-- LED verde, amarelo ou vermelho no próprio rack, mais buzzer quando fica crítico
-- Histórico guardado no InfluxDB, com janelas de 15 minutos até 7 dias
-- Dashboard atualizando ao vivo por WebSocket, com volta automática para
-  consulta periódica se a conexão cair
-- Detecção de queda do dispositivo pelo Last Will do MQTT, então ficar sem dado
-  também vira aviso
-- Mínima, média e máxima do período e tabela dos alertas
-- Um simulador em Python que publica igual ao ESP32, útil para desenvolver sem
-  a placa e como reserva na hora de apresentar
+| Usuário | Papel | O que pode |
+|---|---|---|
+| `visualizador` | Visualizador | Só vê |
+| `operador` | Operador | Comanda atuadores e o simulador |
+| `administrador` | Administrador | Também gera dados, treina modelos, cadastra dispositivos e vê a auditoria |
+
+As senhas são geradas na primeira subida e ficam em `secrets/CREDENCIAIS.txt`.
+
+## O que tem em cada página
+
+| Página | O que faz |
+|---|---|
+| Dashboard | Leituras ao vivo, histórico, estatísticas, atuadores e alertas |
+| Gêmeo digital | Sala em 3D movida só pelos dados do WebSocket |
+| Insights | Saúde, vida útil restante, tendência, alertas e injeção de falha |
+| Assistente | Chat com o LLM local sobre os dados da solução |
+| Laboratório de dados | Geração configurável de dados sintéticos |
+| Treinamento | Dispara o treino e mostra métricas, base simples e importância dos atributos |
+| Dispositivos e regras | Cadastro de dispositivos e regras automáticas |
+| Mensageria | Filas, taxas, consumidores, últimas mensagens e DLQ, ao vivo |
+| Auditoria | Logins, comandos, jobs e perguntas ao assistente |
+| Serviços | Links das interfaces do RabbitMQ, do InfluxDB e do PostgreSQL |
+
+## Sensores, atuadores e equipamentos
+
+| Tipo | Dispositivos |
+|---|---|
+| Sensores | Temperatura dos racks 01 e 02, umidade, luminosidade, corrente do rack, presença |
+| Atuador por regra | Exaustor (liga em 35 °C, desliga em 31 °C), sirene (liga em 38 °C) |
+| Atuador pela Web | Iluminação, e os dois CRACs |
+| Equipamento monitorado | `crac-01` e `crac-02`: vibração, corrente, temperatura e rotação |
+
+Os atuadores mudam a física da sala. Desligar os CRACs esquenta o ambiente, o que
+aciona o exaustor pela regra. Ligar a luz sobe a luminosidade medida.
+
+## O relógio simulado
+
+Cada leitura sai a cada 2 segundos e representa **10 minutos** da vida da sala. Um
+dia passa em cerca de 5 minutos, e uma falha de dias acontece durante a
+apresentação. As horas de vida útil mostradas são horas simuladas.
+
+## Como rodar cada parte da demonstração
+
+O roteiro completo, na ordem da apresentação, está em
+[docs/APRESENTACAO.md](docs/APRESENTACAO.md). Em resumo:
+
+1. **Web para IoT:** no Dashboard, ligue a iluminação e veja a luminosidade subir.
+2. **Regra automática:** desligue os dois CRACs. Em cerca de 30 segundos a
+   temperatura passa de 35 °C e o exaustor liga sozinho.
+3. **Consumidor parado:** rode `docker compose stop recorder` e olhe a fila
+   `q.telemetry.influx` crescer na Mensageria. Com `docker compose start recorder`
+   ela esvazia, e nenhum ponto se perde.
+4. **DLQ:** na Mensageria, clique em "Publicar mensagem inválida".
+5. **IA:** gere dados no Laboratório, treine em Treinamento e injete uma falha em
+   Insights. A saúde cai em cerca de 1 minuto, e a cena 3D acompanha.
+6. **Assistente:** pergunte "qual equipamento está com a pior saúde?".
 
 ## Tecnologias
 
 | Camada | O que usamos |
 |---|---|
-| Dispositivo | ESP32 com DHT22, simulado no Wokwi |
-| Comunicação | MQTT |
-| Broker | Eclipse Mosquitto |
-| Backend | Python com FastAPI e paho-mqtt |
-| Banco | InfluxDB 2.x |
-| Frontend | Vue 3, TypeScript e Vite |
+| Frontend | Vue 3, TypeScript, Vite, Pinia |
 | Gráficos | Chart.js |
+| 3D | Three.js |
+| Backend | Python, FastAPI, WebSocket |
+| IoT | MQTT com Mosquitto, dispositivo simulado em Python |
+| Mensageria | RabbitMQ |
+| IA | scikit-learn (regressão com gradient boosting), numpy e pandas |
+| LLM local | Ollama com `llama3.2:3b`, em CPU |
+| Bancos | PostgreSQL e InfluxDB 2.x |
+| Infra | Docker e Docker Compose |
 
 ## Organização das pastas
 
 ```
 eyeWatcher/
-├── firmware/   sketch do ESP32 e o diagrama do Wokwi
-├── backend/    API em Python, cliente MQTT e o simulador
-├── frontend/   dashboard em Vue
-├── infra/      configuração do Mosquitto e docker-compose
-├── scripts/    scripts de instalação e inicialização no Windows
-└── docs/       documentação do projeto
-```
-
-## Rodando o projeto
-
-Precisa de Python 3.11 ou mais novo, Node 18 ou mais novo, Mosquitto e InfluxDB 2.x.
-
-No Windows dá para instalar o Mosquitto e o InfluxDB com:
-
-```powershell
-.\scripts\install-windows.ps1
-```
-
-Depois, para subir tudo de uma vez:
-
-```powershell
-.\scripts\start-all.ps1
-```
-
-Se preferir na mão:
-
-```bash
-# broker
-mosquitto -c infra/mosquitto/config/mosquitto.conf -v
-
-# banco
-influxd
-# e na primeira vez: .\scripts\setup-influx.ps1
-
-# backend
-cd backend
-python -m venv .venv && source .venv/Scripts/activate
-pip install -r requirements.txt
-cp .env.example .env        # preencher o INFLUX_TOKEN
-python -m app.main
-
-# dashboard
-cd frontend
-npm install
-npm run dev
-```
-
-O dashboard fica em http://localhost:5173 e a documentação da API em
-http://localhost:8000/docs.
-
-Para o ESP32, as instruções estão em [firmware/README.md](firmware/README.md).
-
-## Sem a placa
-
-O simulador publica exatamente o mesmo JSON nos mesmos tópicos:
-
-```bash
-python backend/simulator.py --backfill 12   # preenche 12h de histórico
-python backend/simulator.py                 # publica ao vivo
-python backend/simulator.py --stress        # força um pico crítico
+├── docker-compose.yml   a solução inteira
+├── backend/             todos os serviços Python, uma imagem só
+│   ├── eyewatcher/
+│   │   ├── api/         FastAPI, auth, regras, assistente
+│   │   ├── services/    simulador, gateway, gravador, inferência, lab, treino
+│   │   ├── physics.py   física da sala, usada pelo gerador e pelo simulador
+│   │   └── features.py  features, usadas pelo treino e pela inferência
+│   └── tests/
+├── frontend/            Vue, cena 3D e nginx
+├── infra/               Mosquitto, RabbitMQ e o gerador de segredos
+├── firmware/            ESP32 do 1º bimestre, mantido como histórico
+└── docs/                documentação do projeto
 ```
 
 ## Portas
 
-- 1883 e 9001: Mosquitto (TCP e WebSocket)
-- 8086: InfluxDB
-- 8000: backend
-- 5173: dashboard
+| Porta | Serviço | Acesso |
+|---|---|---|
+| 8080 | Aplicação | Publicada |
+| 15672 | RabbitMQ | Só 127.0.0.1 |
+| 8086 | InfluxDB | Só 127.0.0.1 |
+| 8081 | Adminer (PostgreSQL) | Só 127.0.0.1 |
+
+## Testes
+
+```bash
+cd backend
+pip install -r requirements.txt pytest
+pytest
+```
+
+## Zerar tudo
+
+Apaga os dados, os modelos treinados e o modelo do Ollama:
+
+```bash
+docker compose down -v
+```
 
 ## Documentação
 
-- [docs/PROBLEMA.md](docs/PROBLEMA.md) — o problema e a proposta
-- [docs/ARQUITETURA.md](docs/ARQUITETURA.md) — diagramas e decisões técnicas
-- [docs/CONTRACT.md](docs/CONTRACT.md) — tópicos, formato das mensagens e rotas
-- [docs/APRESENTACAO.md](docs/APRESENTACAO.md) — roteiro da apresentação
-
-## Próximo bimestre
-
-A ideia é continuar daqui: vários racks ao mesmo tempo (os tópicos já estão
-preparados para isso), notificação por e-mail ou Telegram, login no dashboard,
-sensor de corrente e de porta aberta, e uma previsão simples de quando a
-temperatura vai cruzar o limite.
+- [docs/PROBLEMA.md](docs/PROBLEMA.md): o problema e a proposta
+- [docs/ARQUITETURA.md](docs/ARQUITETURA.md): fluxos e decisões técnicas
+- [docs/CONTRACT.md](docs/CONTRACT.md): tópicos, filas, mensagens e rotas
+- [docs/APRESENTACAO.md](docs/APRESENTACAO.md): roteiro da apresentação
 
 ## Autores
 

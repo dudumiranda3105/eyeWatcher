@@ -1,124 +1,116 @@
-# Roteiro da apresentação
+# Roteiro da apresentação (16/11/2026)
 
-Anotações para não esquecer nada na hora. A nota depende de mostrar as coisas
-funcionando, então o foco aqui é o que precisa aparecer na tela.
+Sem slides: o grupo apresenta a aplicação funcionando, nesta ordem.
 
-## Antes de começar
+## Antes de chegar na sala
 
-Rodar `python backend/simulator.py --backfill 12` antes da apresentação, para o
-gráfico já ter histórico. Gráfico com três pontos não convence ninguém.
+- Rode `docker compose up` em casa pelo menos uma vez, com internet. A imagem do
+  Ollama e o modelo de 2 GB precisam já estar baixados.
+- Confira `secrets/CREDENCIAIS.txt`.
+- Na sala, suba tudo uns 5 minutos antes: o LLM demora para carregar na memória.
+  A página Assistente mostra "Modelo pronto" quando estiver no ponto.
 
-Testar a conexão do Wokwi na rede do lugar onde vai ser a apresentação. É comum
-a rede da faculdade bloquear a porta 1883, e descobrir isso na hora é ruim.
+## 1. Subir tudo
 
-Deixar quatro terminais abertos e posicionados: Mosquitto, backend, frontend e um
-`mosquitto_sub` acompanhando as mensagens.
-
-Fazer o push para o GitHub e deixar o repositório aberto numa aba.
-
-## Ordem para subir as coisas
-
-1. Mosquitto (porta 1883)
-2. InfluxDB (porta 8086)
-3. Backend (porta 8000)
-4. Frontend (porta 5173)
-5. Iniciar a simulação no Wokwi
-
-Ou só rodar `.\scripts\start-all.ps1`.
-
-Atenção: o instalador do Mosquitto no Windows cria um serviço que sobe sozinho
-com a configuração padrão dele, sem o listener WebSocket. Se quiser usar a
-configuração do repositório, é preciso parar esse serviço antes e subir o
-Mosquitto na mão.
-
-## O que mostrar em cada parte
-
-### O problema e a solução
-
-Explicar o cenário em mais ou menos um minuto e mostrar o diagrama da
-arquitetura. A frase que resume o projeto: o sensor é independente do servidor
-monitorado, então ele continua reportando justamente quando o servidor cai.
-
-### O dispositivo no Wokwi
-
-Deixar a simulação rodando com o ESP32 e o DHT22 visíveis, com o Serial Monitor
-aberto mostrando a conexão no WiFi e as publicações.
-
-A melhor parte é mexer no slider do DHT22 ao vivo para subir a temperatura e
-mostrar os LEDs mudando de verde para amarelo e depois vermelho, com o buzzer
-tocando no crítico.
-
-### MQTT e Mosquitto
-
-Mostrar o Mosquitto rodando e deixar um terminal com:
-
-```
-mosquitto_sub -h localhost -t "eyewatcher/#" -v
+```bash
+docker compose up -d
 ```
 
-As mensagens vão aparecendo ao vivo durante toda a apresentação, o que já mostra
-o MQTT funcionando sem precisar explicar muito.
-
-A demonstração mais forte é parar a simulação do Wokwi e o dashboard mudar para
-offline sozinho, por causa do Last Will. Vale guardar isso para o final.
-
-Mostrar também o arquivo `infra/mosquitto/config/mosquitto.conf`.
-
-### Backend em Python
-
-Deixar os logs do backend visíveis, mostrando cada mensagem chegando e sendo
-gravada. Abrir a documentação automática em http://localhost:8000/docs e executar
-alguma rota ali mesmo.
-
-Se pedirem para ver código, `app/mqtt_client.py` é o melhor lugar: dá para mostrar
-a validação da mensagem e o recálculo do estado.
-
-### InfluxDB
-
-Abrir http://localhost:8086 e ir no Data Explorer. Rodar:
-
-```flux
-from(bucket: "rack_metrics")
-  |> range(start: -1h)
-  |> filter(fn: (r) => r._measurement == "ambiente")
-  |> filter(fn: (r) => r._field == "temperature")
+```bash
+docker compose ps
 ```
 
-Mostrar as tags no painel do lado e explicar por que série temporal em vez de
-banco relacional (está em ARQUITETURA.md).
+Mostrar todos os containers `healthy`. Os serviços `bootstrap` e `ollama-pull`
+terminam e saem, e isso é o esperado.
 
-### Dashboard
+## 2. Login e os três papéis
 
-Mostrar os cards de indicador, o gráfico com as linhas de limite, trocar o
-período e apontar a tabela de alertas. Enquanto isso o gráfico vai atualizando
-sozinho, porque o WebSocket está recebendo as leituras novas.
+Abrir http://localhost:8080. Entrar como `visualizador` e mostrar que não há botões
+de comando. Entrar como `operador` e mostrar que eles aparecem, mas que o Laboratório
+não deixa gerar. Entrar como `administrador` e mostrar a Auditoria.
 
-Se perguntarem do TypeScript, abrir `src/types/api.ts` e rodar
-`npx vue-tsc --noEmit` ao vivo.
+## 3. Simulador e MQTT
 
-## Sugestão de tempo
+Ver as mensagens passando pelo Mosquitto:
 
-| Quando | O quê |
-|---|---|
-| 0 a 1 min | O problema, com o diagrama |
-| 1 a 2 min | Wokwi e o Serial Monitor |
-| 2 a 3 min | Terminal com as mensagens MQTT chegando |
-| 3 a 4 min | Backend e a documentação da API |
-| 4 a 5 min | InfluxDB no Data Explorer |
-| 5 a 7 min | Dashboard, gráfico e alertas |
-| 7 a 8 min | Subir a temperatura no Wokwi e mostrar tudo reagindo |
-| 8 a 9 min | Parar o Wokwi e mostrar o offline pelo Last Will, depois o GitHub |
-
-## Se o Wokwi não conectar
-
-Não ficar mexendo no firmware na frente do avaliador. A saída é dizer que a rede
-do local bloqueia a porta do broker e que a demonstração vai ser com o publicador
-equivalente em Python, que usa o mesmo tópico e o mesmo formato de mensagem:
-
-```
-python backend/simulator.py --stress
+```bash
+docker compose exec mosquitto sh -c 'mosquitto_sub -u gateway -P "$(cat /run/eyewatcher/gateway)" -t "eyewatcher/+/+/+/telemetry" -C 5 -v'
 ```
 
-Depois mostrar o Wokwi rodando e publicando no Serial Monitor, mesmo sem alcançar
-o broker, para deixar claro que o firmware funciona. O resto da apresentação
-continua igual.
+## 4. API REST
+
+Abrir http://localhost:8080/api/docs.
+
+## 5. Mensageria e o consumidor parado
+
+Abrir a página Mensageria e mostrar filas, consumidores e taxas. Depois:
+
+```bash
+docker compose stop recorder
+```
+
+A fila `q.telemetry.influx` cresce e o consumidor dela fica em zero. Depois:
+
+```bash
+docker compose start recorder
+```
+
+A fila esvazia. Clicar em "Publicar mensagem inválida" e mostrar a mensagem na DLQ.
+
+## 6. Bancos
+
+Página Serviços. No InfluxDB, mostrar o bucket `telemetry`. No Adminer, mostrar as
+tabelas `devices`, `rules` e `audit_log`. No Dashboard, trocar o período do histórico.
+
+## 7. Dashboard em tempo real
+
+Mostrar os indicadores mudando sozinhos e o histórico crescendo.
+
+## 8. Regra automática e controle pela Web
+
+Ligar a iluminação no Dashboard: a luminosidade sobe. Desligar os dois CRACs: em
+cerca de 30 segundos a temperatura passa de 35 °C e o exaustor liga sozinho. Ligar os
+CRACs de novo.
+
+## 9. Laboratório de dados
+
+Mostrar os parâmetros e clicar em Gerar dados. Com o padrão são cerca de 4 milhões de
+leituras. Falar que a API não trava, porque o job roda pela fila.
+
+## 10. Treinamento
+
+Clicar em Treinar modelos. Mostrar MAE, RMSE e R², a comparação com a base simples, o
+gráfico de previsto contra real e a importância dos atributos. Mostrar que a versão
+em uso mudou sem reiniciar nada.
+
+## 11. Falha injetada
+
+Em Insights, escolher "Desgaste de rolamento" no `crac-01` e clicar em Injetar falha.
+Em cerca de 1 minuto a saúde cai abaixo de 65 e abre o alerta. Ir para o Gêmeo digital:
+o CRAC fica vermelho e treme mais. O `crac-02` continua saudável.
+
+## 12. Assistente
+
+Perguntar:
+
+- Qual equipamento está com a pior saúde?
+- O que significa esse alerta e o que devo fazer?
+- Explique as métricas do último treino em palavras simples.
+- Por que vocês usam Mosquitto e RabbitMQ?
+
+## Perguntas que podem aparecer
+
+**Por que dois brokers?** MQTT é leve para o dispositivo e tem Last Will. O RabbitMQ
+dá filas, roteamento e DLQ entre os serviços.
+
+**Como o modelo não "cola"?** Os rótulos só existem no dataset, as janelas só olham
+para trás e a divisão é por equipamento.
+
+**Por que a importância de `hour_sin` é alta?** A temperatura e a corrente têm ciclo
+diário. O modelo usa a hora para separar esse ciclo normal da degradação.
+
+**As horas são reais?** Não: cada leitura vale 10 minutos simulados.
+
+**Por que a vida útil erra mais que a saúde?** Máquinas com o mesmo desgaste podem
+degradar em ritmos diferentes, então prever quando vai falhar é mais difícil do que
+dizer como ela está agora.
