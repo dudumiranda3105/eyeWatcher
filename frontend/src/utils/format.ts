@@ -1,92 +1,68 @@
-import type { RangeKey } from '@/types/api'
+import type { Status } from '@/types/api'
 
-const LOCALE = 'pt-BR'
-
-const decimal1 = new Intl.NumberFormat(LOCALE, {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-})
-
-const integer = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 })
-
-const clockFormatter = new Intl.DateTimeFormat(LOCALE, {
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-})
-
-const dateTimeFormatter = new Intl.DateTimeFormat(LOCALE, {
-  day: '2-digit',
-  month: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-})
-
-const relativeFormatter = new Intl.RelativeTimeFormat(LOCALE, { numeric: 'auto', style: 'short' })
-
-/** Número com uma casa decimal (padrão do contrato para temperatura e umidade). */
-export function formatDecimal(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) return '—'
-  return decimal1.format(value)
+export const STATUS_LABEL: Record<Status, string> = {
+  ok: 'Normal',
+  warning: 'Atenção',
+  critical: 'Crítico',
+  offline: 'Sem dados',
 }
 
-export function formatInteger(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) return '—'
-  return integer.format(value)
+export const METRIC_LABEL: Record<string, string> = {
+  temperature: 'Temperatura',
+  humidity: 'Umidade',
+  luminosity: 'Luminosidade',
+  current: 'Corrente',
+  presence: 'Presença',
+  vibration: 'Vibração',
+  rpm: 'Rotação',
+  on: 'Ligado',
 }
 
-/** hh:mm:ss — usado na tabela de alertas e no rodapé. */
-export function formatClock(iso: string | null | undefined): string {
-  const date = toDate(iso)
-  return date ? clockFormatter.format(date) : '—'
+export const METRIC_UNIT: Record<string, string> = {
+  temperature: '°C',
+  humidity: '%',
+  luminosity: 'lux',
+  current: 'A',
+  vibration: 'mm/s',
+  rpm: 'rpm',
 }
 
-/** dd/mm hh:mm:ss — para períodos longos, onde só a hora é ambígua. */
-export function formatDateTime(iso: string | null | undefined): string {
-  const date = toDate(iso)
-  return date ? dateTimeFormatter.format(date) : '—'
+export const FAILURE_LABEL: Record<string, string> = {
+  bearing_wear: 'Desgaste de rolamento',
+  clogging: 'Entupimento do filtro',
+  overheating: 'Superaquecimento',
+  imbalance: 'Desbalanceamento',
+  sensor_drift: 'Deriva do sensor',
+  sensor_stuck: 'Sensor travado',
 }
 
-/** "há 4 s", "há 2 min" — sempre no passado. */
-export function formatRelative(iso: string | null | undefined, now: number = Date.now()): string {
-  const date = toDate(iso)
-  if (!date) return '—'
+const number1 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1, minimumFractionDigits: 1 })
+const number2 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
+const integer = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
+const clock = new Intl.DateTimeFormat('pt-BR', { timeStyle: 'medium' })
+const dateTime = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'medium' })
 
-  const seconds = Math.round((date.getTime() - now) / 1000)
-  const absolute = Math.abs(seconds)
+export const fmt1 = (value: number): string => number1.format(value)
+export const fmt2 = (value: number): string => number2.format(value)
+export const fmtInt = (value: number): string => integer.format(value)
+export const fmtClock = (value: string | number): string => clock.format(new Date(value))
+export const fmtDateTime = (value: string | number): string => dateTime.format(new Date(value))
 
-  if (absolute < 60) return relativeFormatter.format(Math.min(seconds, 0), 'second')
-  if (absolute < 3600) return relativeFormatter.format(Math.round(seconds / 60), 'minute')
-  if (absolute < 86400) return relativeFormatter.format(Math.round(seconds / 3600), 'hour')
-  return relativeFormatter.format(Math.round(seconds / 86400), 'day')
+export function fmtSimHour(hour: number): string {
+  const whole = Math.floor(hour)
+  const minutes = Math.floor((hour - whole) * 60)
+  return `${String(whole).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
-/** Segundos de uptime → "3 d 04 h 12 min". */
-export function formatUptime(seconds: number | null | undefined): string {
-  if (seconds === null || seconds === undefined || Number.isNaN(seconds)) return '—'
-
-  const total = Math.max(0, Math.floor(seconds))
-  const days = Math.floor(total / 86400)
-  const hours = Math.floor((total % 86400) / 3600)
-  const minutes = Math.floor((total % 3600) / 60)
-
-  if (days > 0) return `${days} d ${String(hours).padStart(2, '0')} h`
-  if (hours > 0) return `${hours} h ${String(minutes).padStart(2, '0')} min`
-  return `${minutes} min`
+export function fmtMetric(metric: string, value: number): string {
+  if (metric === 'on' || metric === 'presence') return value >= 0.5 ? 'Sim' : 'Não'
+  const unit = METRIC_UNIT[metric]
+  const text = metric === 'rpm' || metric === 'luminosity' ? fmtInt(value) : fmt1(value)
+  return unit ? `${text} ${unit}` : text
 }
 
-export const RANGE_LABEL: Record<RangeKey, string> = {
-  '15m': '15 min',
-  '1h': '1 hora',
-  '6h': '6 horas',
-  '24h': '24 horas',
-  '7d': '7 dias',
-  '30d': '30 dias',
-}
-
-function toDate(iso: string | null | undefined): Date | null {
-  if (!iso) return null
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? null : date
+export function healthStatus(health: number): Status {
+  if (health < 40) return 'critical'
+  if (health < 65) return 'warning'
+  return 'ok'
 }

@@ -7,15 +7,22 @@
     <meta name="color-scheme" content="light dark" />
     <meta
       name="description"
-      content="eyeWatcher — monitoramento térmico de racks de servidores em tempo real."
+      content="eyeWatcher — monitoramento AIoT de salas de servidores em tempo real."
     />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Martian+Mono:wght@400;500;700&family=Public+Sans:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
-    <title>eyeWatcher — monitoramento de racks</title>
+    <title>eyeWatcher</title>
+    <script>
+      // Aplica o tema antes da primeira pintura, para a tela nao piscar.
+      ;(function () {
+        var theme = null
+        try {
+          theme = localStorage.getItem("eyewatcher.theme")
+        } catch (error) {}
+        if (theme !== "light" && theme !== "dark") {
+          theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+        }
+        document.documentElement.dataset.theme = theme
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>

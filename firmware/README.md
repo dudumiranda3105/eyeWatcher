@@ -1,3 +1,5 @@
+> Firmware do 1º bimestre, mantido como histórico. A partir do 2º bimestre o dispositivo é o simulador em `backend/eyewatcher/services/simulator.py`, e este sketch não fala mais com o backend atual.
+
 # eyeWatcher — Firmware (ESP32 no Wokwi)
 
 Camada de **firmware** do projeto eyeWatcher: um ESP32 simulado lê temperatura e

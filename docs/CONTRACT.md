@@ -1,180 +1,111 @@
-# CONTRATO TÉCNICO — eyeWatcher
-Interface compartilhada entre firmware, backend e frontend.
-**Nenhuma camada pode alterar este contrato unilateralmente.**
+# Contrato técnico
 
----
+Interface compartilhada entre os serviços. Mudar algo aqui exige mudar todos os lados.
 
-## 1. Identidade do projeto
-- Nome: **eyeWatcher**
-- Problema: racks de servidores (caseiros / pequenas empresas / laboratórios) superaquecem
-  sem aviso; a falha só é descoberta quando o serviço já caiu. Não há histórico para
-  identificar padrões (ex.: pico térmico sempre às 14h).
-- Fluxo obrigatório: `ESP32 (Wokwi) → MQTT → Mosquitto → Python → InfluxDB → Web (Vue 3)`
+## Mensagem
 
-## 2. MQTT
+Toda mensagem, em MQTT ou em AMQP, é um JSON com este formato:
 
-Broker: Mosquitto. Host/porta configuráveis por env.
-- Porta TCP: `1883`
-- Porta WebSocket: `9001`
-- Client ID do ESP32: `esp32-<RACK_ID>`
-
-### Tópicos
-| Tópico | Quem publica | QoS | Retain |
-|---|---|---|---|
-| `eyewatcher/<rack_id>/telemetry` | ESP32 | 0 | false |
-| `eyewatcher/<rack_id>/status`    | ESP32 (LWT + online) | 1 | **true** |
-| `eyewatcher/+/telemetry`         | backend assina | 1 | - |
-| `eyewatcher/+/status`            | backend assina | 1 | - |
-
-> **Nota sobre o QoS da telemetria.** A biblioteca `PubSubClient` do ESP32
-> implementa QoS 1 apenas em *subscribe* e no LWT; o `publish()` dela é sempre
-> QoS 0. Isso é adequado para este caso e foi mantido de propósito: a telemetria
-> é periódica a cada 5 s, então uma leitura perdida é substituída pela seguinte
-> em segundos e não altera a análise da série. O campo `seq` torna qualquer
-> perda detectável. Onde a entrega garantida realmente importa — o **LWT**, que
-> sinaliza a queda do dispositivo, e as **assinaturas do backend** — usa-se
-> QoS 1. Trocar de biblioteca só para elevar o QoS da telemetria adicionaria
-> risco sem benefício prático.
-
-`<rack_id>` do projeto base: `rack01`.
-
-### Payload de `telemetry` (JSON, UTF-8)
 ```json
 {
-  "device_id": "esp32-rack01",
-  "rack_id": "rack01",
-  "location": "Sala de Servidores A",
-  "temperature": 34.5,
-  "humidity": 48.2,
-  "heat_index": 36.1,
-  "status": "ok",
-  "uptime_s": 12345,
-  "seq": 42
+  "id": "6f1c0c1e-4a43-4a57-9a6b-2d3c1f6e8a10",
+  "ts": "2026-11-16T14:03:22.410000+00:00",
+  "type": "telemetry",
+  "device": "crac-01",
+  "payload": {}
 }
 ```
-- `temperature` — °C, float, 1 casa decimal
-- `humidity` — % RH, float, 1 casa decimal
-- `heat_index` — °C, float, sensação térmica (calculada no ESP32)
-- `status` — `"ok"` | `"warning"` | `"critical"` (calculado no ESP32, revalidado no backend)
-- `uptime_s` — segundos desde o boot (int)
-- `seq` — contador incremental de mensagens (int), para detectar perda de pacotes
-- **NÃO** enviar timestamp: o backend carimba a hora de chegada (o ESP32 simulado não tem RTC confiável).
 
-### Payload de `status` (LWT)
-Texto puro: `online` ou `offline`. LWT configurado para publicar `offline` com retain.
+`type` é um de `telemetry`, `command`, `prediction`, `alert`, `event` ou `job`.
 
-### Intervalo de publicação
-5 segundos (constante `PUBLISH_INTERVAL_MS = 5000`).
+### Payload de cada tipo
 
-## 3. Limiares (thresholds)
-Idênticos no firmware e no backend (backend lê de env):
-| Métrica | ok | warning | critical |
-|---|---|---|---|
-| temperatura | < 30 °C | 30–34.9 °C | ≥ 35 °C |
-| umidade | 30–70 % | 20–29.9 % ou 70.1–80 % | < 20 % ou > 80 % |
+Telemetria de sensor:
 
-Status final = o **pior** entre temperatura e umidade.
+```json
+{"metrics": {"temperature": 26.4}, "sim_hour": 14.5}
+```
 
-Env do backend: `TEMP_WARN=30`, `TEMP_CRIT=35`, `HUM_MIN_WARN=30`, `HUM_MIN_CRIT=20`,
-`HUM_MAX_WARN=70`, `HUM_MAX_CRIT=80`.
+Telemetria de equipamento:
 
-## 4. InfluxDB 2.x
-- URL: `http://localhost:8086`
-- Org: `eyewatcher`
-- Bucket: `rack_metrics` (retenção 30d)
-- Token: env `INFLUX_TOKEN`
+```json
+{
+  "metrics": {"vibration": 2.1, "current": 12.3, "temperature": 48.6, "rpm": 1447.0},
+  "sim_hour": 14.5, "on": true, "failed": false, "run_id": 0
+}
+```
 
-### Schema
-Measurement: **`ambiente`**
-- Tags: `device_id`, `rack_id`, `location`, `status`
-- Fields: `temperature` (float), `humidity` (float), `heat_index` (float), `seq` (int)
-- Timestamp: hora de chegada no backend, precisão `ns`
+Previsão:
 
-Measurement: **`device_status`**
-- Tags: `device_id`, `rack_id`
-- Fields: `online` (bool)
+```json
+{"health": 62.8, "rul_h": 73.1, "trend_per_h": -3.61, "model_version": "v1"}
+```
 
-## 5. API HTTP (FastAPI) — `http://localhost:8000`
-Todas as rotas sob `/api`. CORS liberado para `http://localhost:5173`.
+Alerta:
 
-| Método | Rota | Descrição |
+```json
+{"state": "open", "severity": "warning", "health": 62.8, "rul_h": 73.1, "message": "..."}
+```
+
+## MQTT
+
+| Tópico | Quem publica | Retido |
 |---|---|---|
-| GET | `/api/health` | `{status, influx, mqtt}` — saúde dos subsistemas |
-| GET | `/api/racks` | lista de racks com a última leitura de cada |
-| GET | `/api/readings/latest?rack_id=rack01` | última leitura |
-| GET | `/api/readings/history?rack_id=rack01&range=6h&window=1m` | série temporal agregada (mean) |
-| GET | `/api/readings/stats?rack_id=rack01&range=24h` | min/max/avg de temp e umidade |
-| GET | `/api/alerts?rack_id=rack01&range=24h&limit=50` | leituras com status != ok |
-| WS  | `/ws/live` | push em tempo real de cada telemetria recebida |
+| `eyewatcher/<zona>/<tipo>/<id>/telemetry` | Simulador | Não |
+| `eyewatcher/<zona>/<tipo>/<id>/cmd` | Gateway | Não |
+| `eyewatcher/sim/status` | Simulador, com Last Will | Sim |
+| `eyewatcher/sim/config` | Gateway | Sim |
 
-### Formatos de resposta
+## RabbitMQ
 
-`GET /api/racks`
-```json
-[{
-  "rack_id": "rack01", "device_id": "esp32-rack01",
-  "location": "Sala de Servidores A", "online": true,
-  "last_reading": {
-    "time": "2026-09-12T11:47:03.412Z",
-    "temperature": 34.5, "humidity": 48.2, "heat_index": 36.1, "status": "warning"
-  }
-}]
-```
+Vhost `eyewatcher`, exchange `eyewatcher.topic` (topic) e `eyewatcher.dlx` (fanout).
 
-`GET /api/readings/latest` → o objeto `last_reading` acima + `rack_id`, `device_id`, `location`, `online`.
-
-`GET /api/readings/history`
-```json
-{
-  "rack_id": "rack01", "range": "6h", "window": "1m",
-  "points": [
-    {"time": "2026-09-12T05:47:00Z", "temperature": 28.4, "humidity": 52.0, "heat_index": 29.1}
-  ]
-}
-```
-`points` ordenado crescente por `time`. Valores podem ser `null` em lacunas.
-
-`GET /api/readings/stats`
-```json
-{
-  "rack_id": "rack01", "range": "24h", "count": 17280,
-  "temperature": {"min": 24.1, "max": 38.9, "avg": 30.2, "last": 34.5},
-  "humidity":    {"min": 40.0, "max": 61.3, "avg": 49.8, "last": 48.2}
-}
-```
-
-`GET /api/alerts`
-```json
-{"rack_id":"rack01","range":"24h","count":12,"alerts":[
-  {"time":"2026-09-12T11:40:00Z","status":"critical","temperature":36.8,"humidity":48.0,
-   "message":"Temperatura crítica: 36.8 °C"}
-]}
-```
-
-`WS /ws/live` — envia o JSON de telemetria **enriquecido**:
-```json
-{"type":"telemetry","data":{ ...payload..., "time":"2026-09-12T11:47:03.412Z" }}
-```
-e eventos `{"type":"status","data":{"rack_id":"rack01","online":false}}`.
-
-### Erros
-`404` quando `rack_id` não tem dados: `{"detail":"rack não encontrado"}`.
-`503` quando o InfluxDB está inacessível: `{"detail":"influxdb indisponível"}`.
-
-### Parâmetro `range`
-Aceita `15m`, `1h`, `6h`, `24h`, `7d`, `30d`. Default `6h`. Validar e rejeitar outros com `422`.
-
-## 6. Frontend — `http://localhost:5173`
-- Vue 3 (`<script setup>`) + TypeScript **strict** + Vite
-- Gráficos: **Chart.js** via `vue-chartjs`
-- Estado: Pinia. HTTP: axios. Proxy Vite `/api` e `/ws` → `localhost:8000`
-- Tipos TS espelhando as respostas acima em `src/types/api.ts`
-
-## 7. Portas usadas
-| Serviço | Porta |
+| Routing key | Significado |
 |---|---|
-| Mosquitto TCP | 1883 |
-| Mosquitto WS | 9001 |
-| InfluxDB | 8086 |
-| Backend FastAPI | 8000 |
-| Frontend Vite | 5173 |
+| `telemetry.<zona>.<tipo>.<id>` | Leitura de um dispositivo |
+| `command.<zona>.<tipo>.<id>` | Comando para um dispositivo |
+| `prediction.<zona>.<id>` | Previsão da IA |
+| `alert.<zona>.<id>` | Alerta aberto ou encerrado |
+| `event.job.<id>` | Progresso de um job |
+| `event.model.<versao>` | Modelo novo treinado |
+| `job.datagen`, `job.training` | Jobs em segundo plano |
+
+As filas estão em [ARQUITETURA.md](ARQUITETURA.md).
+
+## InfluxDB
+
+Org `eyewatcher`, buckets `telemetry` (ao vivo) e `lab` (amostra sintética).
+
+| Measurement | Tags | Fields |
+|---|---|---|
+| `telemetry` | `device`, `zone`, `type` | As métricas da leitura |
+| `prediction` | `device`, `zone`, `model_version` | `health`, `rul_h` |
+| `lab_equipment` | `equipment`, `mode` | As métricas da leitura |
+
+## API
+
+A documentação completa fica em http://localhost:8080/api/docs. Todas as rotas exigem
+`Authorization: Bearer <jwt>`, menos `/api/auth/login` e `/api/health`.
+
+| Rota | Papel mínimo |
+|---|---|
+| `POST /api/auth/login` | Nenhum |
+| `POST /api/auth/ws-ticket` | Visualizador |
+| `GET /api/devices`, `/rules`, `/alerts`, `/insights`, `/jobs` | Visualizador |
+| `GET /api/readings/history`, `/readings/stats` | Visualizador |
+| `GET /api/messaging/overview`, `/messaging/dlq` | Visualizador |
+| `POST /api/assistant/chat` | Visualizador |
+| `POST /api/devices/{id}/command` | Operador |
+| `POST /api/simulator/command` | Operador |
+| `POST /api/messaging/poison` | Operador |
+| `POST`, `PUT`, `DELETE` em `/api/devices` e `/api/rules` | Administrador |
+| `POST /api/lab/jobs`, `/api/training/jobs` | Administrador |
+| `GET /api/audit` | Administrador |
+
+## WebSocket
+
+`GET /ws/live?ticket=<ticket>`. O ticket vem de `POST /api/auth/ws-ticket`, vale 30
+segundos e só uma vez.
+
+A primeira mensagem é uma foto do estado atual (`type: snapshot`). As seguintes são
+as mensagens do barramento, com `routing_key` junto.

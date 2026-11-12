@@ -1,9 +1,9 @@
 # Configuração de qualidade do backend do eyeWatcher.
-# Uso:  ruff check .   |   ruff format --check .   |   mypy app simulator.py
+# Uso:  ruff check .   |   ruff format --check .   |   pytest
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py313"
 exclude = [".venv", "__pycache__"]
 
 [tool.ruff.lint]
@@ -11,17 +11,6 @@ select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
 # E501 fica a cargo do formatter; comentários longos em português são aceitáveis.
 ignore = ["E501"]
 
-[tool.mypy]
-python_version = "3.11"
-strict = true
-warn_unused_ignores = true
-# O influxdb-client e o paho-mqtt não publicam type stubs completos: seus módulos
-# não declaram __all__ e suas funções internas não têm anotação. Sem isto, o mypy
-# em modo strict acusa ~18 erros que são da biblioteca, não deste projeto.
-# "follow_imports = skip" faz o mypy tratá-las como Any — preferível a espalhar
-# "type: ignore" pelo código, que mascararia erros nossos de verdade.
-[[tool.mypy.overrides]]
-module = ["influxdb_client.*", "paho.*"]
-follow_imports = "skip"
-ignore_missing_imports = true
-disallow_untyped_calls = false
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
