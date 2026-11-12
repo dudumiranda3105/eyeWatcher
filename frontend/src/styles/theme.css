@@ -1,80 +1,95 @@
 /* ============================================================
-   eyeWatcher — painel de instrumentos de sala de servidores
-   Claro = aço pintado (padrão; projetor não lava o fundo)
-   Escuro = petróleo profundo, quando o sistema pede
+   eyeWatcher: painel de sala de servidores
+   Claro = aço pintado (projetor não lava o fundo)
+   Escuro = preto neutro
+   Formas: controles 8px, painéis 14px, selos em pílula.
+   Um único acento (--accent); verde, âmbar e vermelho são só estado.
    ============================================================ */
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   /* Superfícies */
-  --bg: #e5ebee;
-  --bg-grid: rgba(16, 33, 42, 0.05);
+  --bg: #edf1f3;
+  --bg-grid: rgba(16, 33, 42, 0.045);
   --panel: #ffffff;
-  --panel-sunk: #f1f5f7;
-  --line: #ccd8dd;
-  --line-strong: #a3b6be;
+  --panel-sunk: #f2f5f7;
+  --line: #dbe3e8;
+  --line-strong: #b3c2ca;
 
   /* Tinta */
   --ink: #0f212a;
-  --ink-muted: #4c6672;
-  --ink-faint: #74909c;
+  --ink-muted: #48626e;
+  --ink-faint: #5f7a87;
 
-  /* Status (contrato: ok / warning / critical) */
-  --ok: #0c8c7d;
-  --ok-wash: #d3ece8;
-  --warn: #b9720a;
-  --warn-wash: #f8e6c8;
-  --crit: #c3341f;
-  --crit-wash: #f8dcd6;
+  /* Acento */
+  --accent: #0b68c4;
+  --accent-strong: #08549f;
+  --accent-ink: #ffffff;
+  --accent-wash: #e3eefa;
+
+  /* Estado */
+  --ok: #0a8375;
+  --ok-wash: #d6eeea;
+  --warn: #a8660a;
+  --warn-wash: #f9e9cc;
+  --crit: #bf311d;
+  --crit-wash: #f9ded8;
   --on-status: #ffffff;
 
   /* Séries */
-  --temp: #dd5620;
-  --umid: #2a74bd;
-  --temp-fill: rgba(221, 86, 32, 0.12);
-  --umid-fill: rgba(42, 116, 189, 0.1);
+  --temp: #d9541f;
+  --umid: #0b68c4;
+  --temp-fill: rgba(217, 84, 31, 0.12);
+  --umid-fill: rgba(11, 104, 196, 0.1);
 
   /* Tipografia */
-  --font-display: 'Archivo', 'Segoe UI', system-ui, sans-serif;
-  --font-body: 'Public Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Archivo Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Public Sans Variable', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'Martian Mono', 'Cascadia Mono', ui-monospace, 'Courier New', monospace;
 
   /* Ritmo */
-  --radius: 4px;
-  --radius-lg: 8px;
-  --gap: 16px;
-  --shadow: 0 1px 2px rgba(15, 33, 42, 0.06), 0 8px 24px -18px rgba(15, 33, 42, 0.45);
+  --radius: 8px;
+  --radius-lg: 14px;
+  --gap: 18px;
+  --shadow: 0 1px 2px rgba(15, 33, 42, 0.05), 0 10px 28px -20px rgba(15, 33, 42, 0.4);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b161b;
-    --bg-grid: rgba(160, 210, 224, 0.045);
-    --panel: #13232b;
-    --panel-sunk: #0f1d24;
-    --line: #223b46;
-    --line-strong: #365764;
+:root[data-theme='dark'] {
+  color-scheme: dark;
 
-    --ink: #e6f0f3;
-    --ink-muted: #97aeb9;
-    --ink-faint: #6d8794;
+  /* Preto neutro: sem tom azulado nas superfícies. */
+  --bg: #050505;
+  --bg-grid: rgba(255, 255, 255, 0.035);
+  --panel: #0f0f10;
+  --panel-sunk: #09090a;
+  --line: #232427;
+  --line-strong: #3b3d42;
 
-    --ok: #2ed0ba;
-    --ok-wash: rgba(46, 208, 186, 0.14);
-    --warn: #f6b53f;
-    --warn-wash: rgba(246, 181, 63, 0.14);
-    --crit: #ff6a56;
-    --crit-wash: rgba(255, 106, 86, 0.16);
-    --on-status: #08151a;
+  --ink: #f2f3f5;
+  --ink-muted: #a8abb1;
+  --ink-faint: #7f838a;
 
-    --temp: #ff7d45;
-    --umid: #63b2ec;
-    --temp-fill: rgba(255, 125, 69, 0.14);
-    --umid-fill: rgba(99, 178, 236, 0.16);
+  --accent: #5aa8ff;
+  --accent-strong: #84bdff;
+  --accent-ink: #04101a;
+  --accent-wash: rgba(90, 168, 255, 0.14);
 
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -20px rgba(0, 0, 0, 0.8);
-  }
+  --ok: #2ed0ba;
+  --ok-wash: rgba(46, 208, 186, 0.13);
+  --warn: #f6b53f;
+  --warn-wash: rgba(246, 181, 63, 0.13);
+  --crit: #ff6a56;
+  --crit-wash: rgba(255, 106, 86, 0.15);
+  --on-status: #050505;
+
+  --temp: #ff8a55;
+  --umid: #5aa8ff;
+  --temp-fill: rgba(255, 138, 85, 0.14);
+  --umid-fill: rgba(90, 168, 255, 0.16);
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 16px 36px -24px rgba(0, 0, 0, 0.9);
 }
 
 *,
@@ -106,8 +121,8 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 650;
+  letter-spacing: -0.015em;
   margin: 0;
 }
 
@@ -116,10 +131,23 @@ button {
   color: inherit;
 }
 
+code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--panel-sunk);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
 :focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: var(--accent-wash);
 }
 
 /* Etiqueta de painel: pequena, monoespaçada, muito espaçada. */
@@ -127,7 +155,7 @@ button {
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink-faint);
 }
@@ -144,7 +172,7 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-/* Pintura por status — usada em cards, banner, badges e réguas. */
+/* Pintura por estado: usada em cards, selos e medidores. */
 [data-status='ok'] {
   --status: var(--ok);
   --status-wash: var(--ok-wash);
@@ -163,6 +191,292 @@ button {
 [data-status='offline'] {
   --status: var(--ink-faint);
   --status-wash: var(--panel-sunk);
+}
+
+/* Componentes compartilhados pelas páginas. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  padding: 28px 32px 40px;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+  animation: page-in 0.35s var(--ease) both;
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--gap);
+  flex-wrap: wrap;
+  padding-bottom: 4px;
+}
+
+.page-head h1 {
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.page-head p {
+  margin: 6px 0 0;
+  color: var(--ink-muted);
+  max-width: 68ch;
+}
+
+.grid {
+  display: grid;
+  gap: var(--gap);
+  grid-template-columns: repeat(auto-fit, minmax(var(--min, 220px), 1fr));
+}
+
+.panel-body {
+  padding: 18px 20px;
+}
+
+.panel-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.panel-title h2 {
+  font-size: 16px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 7px 13px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 550;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    transform 0.15s var(--ease);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--panel-sunk);
+  border-color: var(--ink-faint);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+.btn-danger {
+  border-color: var(--crit);
+  color: var(--crit);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--crit-wash);
+  border-color: var(--crit);
+}
+
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.field input,
+.field select,
+.input {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--ink);
+  background: var(--panel-sunk);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  width: 100%;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.field input:hover,
+.field select:hover,
+.input:hover {
+  border-color: var(--line-strong);
+}
+
+.field input:focus,
+.field select:focus,
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+table.data th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 500;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line-strong);
+  white-space: nowrap;
+}
+
+table.data td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+table.data tbody tr {
+  transition: background-color 0.12s;
+}
+
+table.data tbody tr:hover {
+  background: var(--panel-sunk);
+}
+
+table.data tr:last-child td {
+  border-bottom: 0;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  margin: 0 -8px;
+  padding: 0 8px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--status, var(--ink-muted));
+  background: var(--status-wash, var(--panel-sunk));
+  white-space: nowrap;
+}
+
+/* O ponto do selo carrega o estado real do item, nunca enfeite. */
+.badge[data-status]::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge[data-status='critical']::before {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.muted {
+  color: var(--ink-muted);
+}
+
+.note {
+  color: var(--ink-muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.empty {
+  padding: 36px 16px;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+.error {
+  color: var(--crit);
+  font-size: 14px;
+  margin: 0;
+}
+
+.progress {
+  height: 6px;
+  background: var(--panel-sunk);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.4s var(--ease);
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 18px 16px 28px;
+  }
+
+  .page-head h1 {
+    font-size: 24px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

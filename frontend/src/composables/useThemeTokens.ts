@@ -1,4 +1,5 @@
-import { onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
+import { nextTick, onMounted, ref, watch, type Ref } from 'vue'
+import { theme } from '@/composables/useTheme'
 
 export interface ThemeTokens {
   ink: string
@@ -6,10 +7,12 @@ export interface ThemeTokens {
   inkFaint: string
   line: string
   panel: string
+  accent: string
   temp: string
   umid: string
   tempFill: string
   umidFill: string
+  ok: string
   warn: string
   crit: string
 }
@@ -20,61 +23,59 @@ const TOKEN_MAP: Record<keyof ThemeTokens, string> = {
   inkFaint: '--ink-faint',
   line: '--line',
   panel: '--panel',
+  accent: '--accent',
   temp: '--temp',
   umid: '--umid',
   tempFill: '--temp-fill',
   umidFill: '--umid-fill',
+  ok: '--ok',
   warn: '--warn',
   crit: '--crit',
 }
 
 const FALLBACK: ThemeTokens = {
   ink: '#0f212a',
-  inkMuted: '#4c6672',
-  inkFaint: '#74909c',
-  line: '#ccd8dd',
+  inkMuted: '#48626e',
+  inkFaint: '#5f7a87',
+  line: '#dbe3e8',
   panel: '#ffffff',
-  temp: '#dd5620',
-  umid: '#2a74bd',
-  tempFill: 'rgba(221, 86, 32, 0.12)',
-  umidFill: 'rgba(42, 116, 189, 0.1)',
-  warn: '#b9720a',
-  crit: '#c3341f',
+  accent: '#0b68c4',
+  temp: '#d9541f',
+  umid: '#0b68c4',
+  tempFill: 'rgba(217, 84, 31, 0.12)',
+  umidFill: 'rgba(11, 104, 196, 0.1)',
+  ok: '#0a8375',
+  warn: '#a8660a',
+  crit: '#bf311d',
 }
 
 function readTokens(): ThemeTokens {
-  if (typeof window === 'undefined') return FALLBACK
-
   const styles = window.getComputedStyle(document.documentElement)
   const entries = Object.entries(TOKEN_MAP) as [keyof ThemeTokens, string][]
 
-  return entries.reduce<ThemeTokens>((tokens, [key, cssVar]) => {
-    const value = styles.getPropertyValue(cssVar).trim()
-    if (value) tokens[key] = value
-    return tokens
-  }, { ...FALLBACK })
+  return entries.reduce<ThemeTokens>(
+    (tokens, [key, cssVar]) => {
+      const value = styles.getPropertyValue(cssVar).trim()
+      if (value) tokens[key] = value
+      return tokens
+    },
+    { ...FALLBACK },
+  )
 }
 
 /**
  * Lê as cores do tema atual para alimentar o Chart.js (que desenha em canvas
- * e não enxerga variáveis CSS) e reage à troca de claro/escuro do sistema.
+ * e não enxerga variáveis CSS) e reage à troca de claro/escuro.
  */
 export function useThemeTokens(): Ref<ThemeTokens> {
   const tokens = ref<ThemeTokens>(FALLBACK)
-  const media = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: dark)') : null
 
   const sync = (): void => {
     tokens.value = readTokens()
   }
 
-  onMounted(() => {
-    sync()
-    media?.addEventListener('change', sync)
-  })
-
-  onBeforeUnmount(() => {
-    media?.removeEventListener('change', sync)
-  })
+  onMounted(sync)
+  watch(theme, () => void nextTick(sync))
 
   return tokens
 }
