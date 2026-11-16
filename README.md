@@ -43,16 +43,34 @@ Todo dado passa pelo RabbitMQ. O detalhe de cada fluxo está em
 
 ## Rodando
 
-Precisa só do Docker com Compose. No Windows, a virtualização precisa estar ligada
-na BIOS e o WSL2 com pelo menos 8 GB de memória.
+### Começo rápido (dois cliques)
+
+1. Instale o [Docker Desktop](https://www.docker.com/products/docker-desktop/) e abra
+   ele uma vez. No Windows, a virtualização precisa estar ligada na BIOS e o WSL2 com
+   pelo menos 8 GB de memória.
+2. Baixe o projeto (**Code → Download ZIP** aqui no GitHub e extraia, ou `git clone`).
+3. Dê dois cliques em **`iniciar.bat`** (Windows) ou rode `./iniciar.sh` (Linux e macOS).
+
+O script abre o Docker Desktop se ele estiver fechado, sobe os 16 serviços, espera a
+aplicação responder, mostra os logins na tela e abre o navegador em
+**http://localhost:8080**. Para desligar, use **`parar.bat`** ou `./parar.sh`; os dados
+ficam guardados para a próxima vez.
+
+**Não existe chave nem arquivo `.env` para configurar.** O serviço `bootstrap` gera
+todas as senhas sozinho na primeira subida e as grava em `secrets/CREDENCIAIS.txt`,
+que fica fora do Git. Nada de segredo está neste repositório.
+
+A primeira subida demora (uns 10 a 20 minutos, dependendo da internet), porque
+compila as imagens e baixa o modelo do Ollama (cerca de 2 GB). As próximas levam
+poucos minutos.
+
+### Pelo terminal
+
+É o que os scripts fazem por baixo:
 
 ```bash
-docker compose up
+docker compose up -d --build
 ```
-
-Não tem nenhum passo antes disso. O serviço `bootstrap` gera todas as senhas em
-`secrets/`, que fica fora do Git. A primeira subida demora mais, porque compila as
-imagens e baixa o modelo do Ollama (cerca de 2 GB).
 
 A aplicação fica em **http://localhost:8080**.
 

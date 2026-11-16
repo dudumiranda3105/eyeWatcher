@@ -2,3 +2,7 @@
 * text=auto eol=lf
 *.png binary
 *.jpg binary
+
+# Arquivos .bat precisam de CRLF para o cmd.exe ler os rotulos (goto) direito.
+*.bat text eol=crlf
+*.sh text eol=lf
