@@ -43,16 +43,31 @@ Todo dado passa pelo RabbitMQ. O detalhe de cada fluxo está em
 
 ## Rodando
 
+### O que precisa estar instalado
+
+| Item | Detalhe |
+|---|---|
+| **Docker Desktop** | É a única coisa para instalar: [baixar aqui](https://www.docker.com/products/docker-desktop/). Já inclui o Docker Compose. No Linux, use o Docker Engine com o plugin `docker-compose-plugin`. |
+| Sistema | Windows 10 ou 11 de 64 bits, macOS ou Linux |
+| Virtualização | Ligada na BIOS (no Windows também precisa do WSL2; o instalador do Docker cuida disso e pode pedir para reiniciar) |
+| Memória | 8 GB livres para o Docker ou mais, por causa do modelo de IA |
+| Disco | Uns 15 GB livres |
+| Internet | Só na primeira subida, para baixar as imagens e o modelo de IA |
+| Portas livres | 8080, 15672, 8086 e 8081 |
+
+Não precisa instalar Python, Node, banco de dados nem nada além do Docker: tudo roda
+dentro dos containers.
+
 ### Começo rápido (dois cliques)
 
-1. Instale o [Docker Desktop](https://www.docker.com/products/docker-desktop/) e abra
-   ele uma vez. No Windows, a virtualização precisa estar ligada na BIOS e o WSL2 com
-   pelo menos 8 GB de memória.
+1. Instale o Docker Desktop (tabela acima), abra ele uma vez e aceite os termos.
 2. Baixe o projeto (**Code → Download ZIP** aqui no GitHub e extraia, ou `git clone`).
 3. Dê dois cliques em **`iniciar.bat`** (Windows) ou rode `./iniciar.sh` (Linux e macOS).
 
-O script abre o Docker Desktop se ele estiver fechado, sobe os 16 serviços, espera a
-aplicação responder, mostra os logins na tela e abre o navegador em
+O script primeiro confere o computador e **avisa o que falta**: Docker não instalado,
+Docker Compose ausente ou antigo, Docker fechado, pouca memória ou disco, portas
+ocupadas. Depois abre o Docker Desktop se ele estiver fechado, sobe os 16 serviços,
+espera a aplicação responder, mostra os logins na tela e abre o navegador em
 **http://localhost:8080**. Para desligar, use **`parar.bat`** ou `./parar.sh`; os dados
 ficam guardados para a próxima vez.
 
@@ -63,6 +78,18 @@ que fica fora do Git. Nada de segredo está neste repositório.
 A primeira subida demora (uns 10 a 20 minutos, dependendo da internet), porque
 compila as imagens e baixa o modelo do Ollama (cerca de 2 GB). As próximas levam
 poucos minutos.
+
+### Se der erro
+
+| O que aparece | O que fazer |
+|---|---|
+| `FALTA INSTALAR: Docker Desktop` | Instale pelo link da tabela acima, reinicie se o instalador pedir, abra o Docker Desktop e rode o script de novo |
+| `O Docker Desktop nao ficou pronto a tempo` | Aceite os termos na janela do Docker; confira se a virtualização está ligada na BIOS; no PowerShell como administrador, rode `wsl --install` e reinicie |
+| `FALTA ATUALIZAR: Docker Compose` | Atualize o Docker Desktop para a versão mais recente |
+| `PORTA JA EM USO` | Feche o programa que usa a porta (`netstat -ano \| findstr :8080` mostra o PID) |
+| `AVISO` de memória | Dê pelo menos 8 GB ao Docker (no WSL2, arquivo `.wslconfig` com `memory=8GB`) |
+| `Algo deu errado ao subir` | Confira a internet (a primeira subida baixa tudo) e o espaço em disco; detalhes em `docker compose logs` |
+| Assistente sem "Modelo pronto" | Espere alguns minutos: o modelo de IA ainda está carregando na memória |
 
 ### Pelo terminal
 
